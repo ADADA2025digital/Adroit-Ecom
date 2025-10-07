@@ -97,7 +97,7 @@ const CheckoutPage = () => {
       } catch (error) {
         setIsLoggedIn(false);
         setIsLoadingAddresses(false);
-        // console.error("Error fetching user data:", error);
+        console.error("Error fetching user data:", error);
       }
     };
 
