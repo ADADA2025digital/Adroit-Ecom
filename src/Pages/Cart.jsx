@@ -6,9 +6,8 @@ import GlobalButton from "../Components/Button";
 
 const Cart = () => {
   const [cart, setCart] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate(); // Add useNavigate hook
+  const navigate = useNavigate();
 
   const token = localStorage.getItem("auth_token");
 
@@ -22,18 +21,15 @@ const Cart = () => {
       } else {
         // For authenticated users, try to load from localStorage as fallback
         const cachedCart = JSON.parse(localStorage.getItem("cached_cart") || "[]");
-        if (cachedCart.length > 0) {
-          setCart(cachedCart);
-        }
+        setCart(cachedCart);
       }
     };
 
     loadInitialCart();
-    fetchCart(); // Then fetch updated cart data
+    fetchCart(); // Then fetch updated cart data in background
   }, []);
 
   const fetchCart = async () => {
-    setIsLoading(true);
     setError("");
 
     try {
@@ -41,11 +37,10 @@ const Cart = () => {
         const guestCart = JSON.parse(localStorage.getItem("guest_cart") || "[]");
 
         if (guestCart.length === 0) {
-          setIsLoading(false);
           return;
         }
 
-        // Enrich guest cart with product details
+        // Enrich guest cart with product details in background
         const { data: allProducts } = await axios.get("/api/products");
         const enrichedGuestCart = guestCart.map((item) => {
           const product = allProducts.find((p) => p.id === item.id);
@@ -60,11 +55,10 @@ const Cart = () => {
         });
 
         setCart(enrichedGuestCart);
-        setIsLoading(false);
         return;
       }
 
-      // For authenticated users
+      // For authenticated users - fetch in background
       const res = await axios.get("/api/cart/view", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -74,11 +68,10 @@ const Cart = () => {
       
       // Cache the cart data for instant loading next time
       localStorage.setItem("cached_cart", JSON.stringify(cartData));
-      setIsLoading(false);
     } catch (err) {
-      // console.error("❌ Cart load error", err);
+      console.error("❌ Cart load error", err);
       setError("Failed to load cart. Please try again.");
-      setIsLoading(false);
+      // Don't clear cart on error - keep showing cached data
     }
   };
 
@@ -112,7 +105,7 @@ const Cart = () => {
         return;
       }
 
-      // For authenticated users, sync with server
+      // For authenticated users, sync with server in background
       await axios.put(
         `/api/cart/${productId}/update`,
         { quantity: newQuantity },
@@ -122,7 +115,7 @@ const Cart = () => {
       // Update cache
       localStorage.setItem("cached_cart", JSON.stringify(updatedCart));
     } catch (err) {
-      // console.error("❌ Failed to update quantity", err);
+      console.error("❌ Failed to update quantity", err);
       // Revert UI on error
       setCart(cart);
       alert("Failed to update quantity.");
@@ -153,7 +146,7 @@ const Cart = () => {
       // Update cache
       localStorage.setItem("cached_cart", JSON.stringify(updatedCart));
     } catch (err) {
-      // console.error("❌ Failed to remove item", err);
+      console.error("❌ Failed to remove item", err);
       // Revert UI on error
       setCart(previousCart);
       alert("Failed to remove item.");
@@ -189,20 +182,13 @@ const Cart = () => {
     <section>
       <PageHeader title="Cart" path="Home / Cart" />
       <div className="container py-5">
-        {/* {error && (
-          <div className="alert alert-danger text-center">
-            {error}
+        {error && (
+          <div className="alert alert-warning text-center">
+            {error} (Showing cached data)
           </div>
-        )} */}
+        )}
 
-        {isLoading ? (
-          <div className="text-center">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
-            </div>
-            <p className="mt-2">Loading your cart...</p>
-          </div>
-        ) : cart.length === 0 ? (
+        {cart.length === 0 ? (
           <div className="text-center">
             <h4>Your cart is empty!</h4>
             <Link to="/shop" className="btn btn-primary mt-3">

@@ -16,7 +16,10 @@ import RenderOrderCard from "../Components/RenderOrderCard";
 import OrderDetailsModal from "../Components/OrderDetailsModal";
 
 const Dashboard = ({ handleLogout }) => {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  // Get initial tab from localStorage or default to "dashboard"
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem("dashboardActiveTab") || "dashboard";
+  });
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   
@@ -54,6 +57,11 @@ const Dashboard = ({ handleLogout }) => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
   const [invoiceError, setInvoiceError] = useState(null);
+
+  // Update localStorage whenever activeTab changes
+  useEffect(() => {
+    localStorage.setItem("dashboardActiveTab", activeTab);
+  }, [activeTab]);
 
   // -------- Helper to safely get an item's image URL --------
   const getItemImageUrl = (item) => {
@@ -97,7 +105,6 @@ const Dashboard = ({ handleLogout }) => {
         );
         setUser(response.data);
       } catch (err) {
-        // console.error("Failed to fetch user:", err);
         performLogout();
       }
     };
@@ -123,7 +130,6 @@ const Dashboard = ({ handleLogout }) => {
       }
     } catch (err) {
       setAddressError(err.response?.data?.message || err.message);
-      // console.error("Failed to fetch addresses:", err);
     }
   };
 
@@ -187,7 +193,6 @@ const Dashboard = ({ handleLogout }) => {
   const fetchCancellations = async () => {
     try {
       const token = localStorage.getItem("auth_token");
-      // console.log("🔑 Auth Token:", token);
 
       const response = await axios.get(
         `${import.meta.env.VITE_API_URL}api/orders/cancellations`,
@@ -197,16 +202,10 @@ const Dashboard = ({ handleLogout }) => {
         }
       );
 
-      // console.log("📥 Full API Response:", response);
-
       if (response.data.success) {
-        // console.log("✅ Cancellation Data:", response.data.data);
         setCancellations(response.data.data);
-      } else {
-        // console.warn("⚠️ API returned success=false:", response.data);
       }
     } catch (err) {
-      // console.error("❌ Failed to fetch cancellations:", err);
       setCancellationError(err.response?.data?.message || err.message);
     }
   };
@@ -245,7 +244,6 @@ const Dashboard = ({ handleLogout }) => {
       }
     } catch (err) {
       setWalletError(err.response?.data?.message || err.message);
-      // console.error("Failed to fetch wallet data:", err);
     }
   };
 
@@ -274,7 +272,6 @@ const Dashboard = ({ handleLogout }) => {
         );
       }
     } catch (err) {
-      // console.error("Error during logout:", err);
     } finally {
       localStorage.clear();
       sessionStorage.clear();
@@ -360,7 +357,6 @@ const Dashboard = ({ handleLogout }) => {
         state: { amount, orderId: s.order_id },
       });
     } catch (err) {
-      // console.error("redirectToPaymentBySummary error:", err);
       Swal.fire({
         title: "Unable to start payment",
         text:
@@ -464,7 +460,6 @@ const Dashboard = ({ handleLogout }) => {
         throw new Error(response.data.message || "Failed to cancel order");
       }
     } catch (err) {
-      // console.error("Cancellation error:", err);
       Swal.fire({
         title: "Error",
         text:
@@ -555,7 +550,6 @@ const Dashboard = ({ handleLogout }) => {
         throw new Error(response.data.message || "Failed to fetch invoice");
       }
     } catch (err) {
-      // console.error("Invoice fetch error:", err);
       setInvoiceError(err.response?.data?.message || err.message);
       Swal.fire({
         title: "Error",
@@ -751,32 +745,13 @@ const Dashboard = ({ handleLogout }) => {
     }
   };
 
-  // ---- Skeleton Component ----
-  const SkeletonPill = ({ width = 80, height = 28, className = "" }) => (
-    <span
-      className={`rounded-0 border-bottom border-3 rounded-3 px-2 ${className}`}
-      style={{
-        width,
-        height,
-        display: "inline-block",
-        background:
-          "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%)",
-        backgroundSize: "400% 100%",
-        animation: "shine 1.4s ease infinite",
-      }}
-      aria-hidden="true"
-    />
-  );
+  // Tab change handler
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+  };
 
   return (
     <>
-      <style>{`
-        @keyframes shine {
-          0% { background-position: 100% 0; }
-          100% { background-position: 0 0; }
-        }
-      `}</style>
-
       <PageHeader title="Shop" path="Home / Dashboard" />
       <div className="container py-5">
         <div className="row">
@@ -798,10 +773,7 @@ const Dashboard = ({ handleLogout }) => {
                       height: "100%",
                       display: "block",
                       borderRadius: "50%",
-                      background:
-                        "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%)",
-                      backgroundSize: "400% 100%",
-                      animation: "shine 1.4s ease infinite",
+                      background: "#e9ecef",
                     }}
                   />
                 )}
@@ -827,8 +799,8 @@ const Dashboard = ({ handleLogout }) => {
                   </>
                 ) : (
                   <>
-                    <SkeletonPill width={160} height={16} className="mb-1" />
-                    <SkeletonPill width={140} height={14} />
+                    <div className="mb-1 bg-light rounded" style={{ width: "160px", height: "16px" }} />
+                    <div className="bg-light rounded" style={{ width: "140px", height: "14px" }} />
                   </>
                 )}
               </div>
@@ -841,7 +813,7 @@ const Dashboard = ({ handleLogout }) => {
                     ? "active text-primary active-tab ps-1"
                     : ""
                 }`}
-                onClick={() => setActiveTab("dashboard")}
+                onClick={() => handleTabChange("dashboard")}
                 style={{ cursor: "pointer" }}
               >
                 <i className="bi bi-speedometer2 p-2 me-2 fs-3 text-primary"></i>{" "}
@@ -853,7 +825,7 @@ const Dashboard = ({ handleLogout }) => {
                     ? "active text-primary active-tab ps-1"
                     : ""
                 }`}
-                onClick={() => setActiveTab("orders")}
+                onClick={() => handleTabChange("orders")}
                 style={{ cursor: "pointer" }}
               >
                 <i className="bi bi-bag-check p-2 me-2 fs-4 text-primary"></i>{" "}
@@ -865,7 +837,7 @@ const Dashboard = ({ handleLogout }) => {
                     ? "active text-primary active-tab ps-1"
                     : ""
                 }`}
-                onClick={() => setActiveTab("unpaidOrders")}
+                onClick={() => handleTabChange("unpaidOrders")}
                 style={{ cursor: "pointer" }}
               >
                 <i className="bi bi-bag-x p-2 me-2 fs-4 text-primary"></i>{" "}
@@ -878,7 +850,7 @@ const Dashboard = ({ handleLogout }) => {
                     ? "active text-primary ps-1 active-tab"
                     : ""
                 }`}
-                onClick={() => setActiveTab("refund")}
+                onClick={() => handleTabChange("refund")}
                 style={{ cursor: "pointer" }}
               >
                 <i className="bi bi-clock-history p-2 me-2 fs-4 text-primary"></i>{" "}
@@ -891,7 +863,7 @@ const Dashboard = ({ handleLogout }) => {
                     ? "active text-primary active-tab ps-1"
                     : ""
                 }`}
-                onClick={() => setActiveTab("addresses")}
+                onClick={() => handleTabChange("addresses")}
                 style={{ cursor: "pointer" }}
               >
                 <i className="bi bi-geo-alt p-2 me-2 fs-4 text-primary"></i>
@@ -904,7 +876,7 @@ const Dashboard = ({ handleLogout }) => {
                     ? "active text-primary active-tab ps-1"
                     : ""
                 }`}
-                onClick={() => setActiveTab("reviews")}
+                onClick={() => handleTabChange("reviews")}
                 style={{ cursor: "pointer" }}
               >
                 <i className="bi bi-chat-left-text p-2 me-2 fs-4 text-primary"></i>
@@ -930,7 +902,7 @@ const Dashboard = ({ handleLogout }) => {
               <div className="row row-cols-4 g-2 p-2 text-center">
                 <div
                   className="border py-3"
-                  onClick={() => setActiveTab("dashboard")}
+                  onClick={() => handleTabChange("dashboard")}
                   style={{ cursor: "pointer" }}
                 >
                   <i className="bi bi-speedometer2 fs-3 text-primary"></i>
@@ -938,7 +910,7 @@ const Dashboard = ({ handleLogout }) => {
                 </div>
                 <div
                   className="border py-3"
-                  onClick={() => setActiveTab("orders")}
+                  onClick={() => handleTabChange("orders")}
                   style={{ cursor: "pointer" }}
                 >
                   <i className="bi bi-bag-check fs-3 text-primary"></i>
@@ -946,7 +918,7 @@ const Dashboard = ({ handleLogout }) => {
                 </div>
                 <div
                   className="border py-3"
-                  onClick={() => setActiveTab("unpaidOrders")}
+                  onClick={() => handleTabChange("unpaidOrders")}
                   style={{ cursor: "pointer" }}
                 >
                   <i className="bi bi-bag-x fs-3 text-primary"></i>
@@ -954,7 +926,7 @@ const Dashboard = ({ handleLogout }) => {
                 </div>
                 <div
                   className="border py-3"
-                  onClick={() => setActiveTab("refund")}
+                  onClick={() => handleTabChange("refund")}
                   style={{ cursor: "pointer" }}
                 >
                   <i className="bi bi-clock-history fs-3 text-primary"></i>
@@ -962,7 +934,7 @@ const Dashboard = ({ handleLogout }) => {
                 </div>
                 <div
                   className="border py-3"
-                  onClick={() => setActiveTab("addresses")}
+                  onClick={() => handleTabChange("addresses")}
                   style={{ cursor: "pointer" }}
                 >
                   <i className="bi bi-geo-alt fs-3 text-primary"></i>
@@ -970,7 +942,7 @@ const Dashboard = ({ handleLogout }) => {
                 </div>
                 <div
                   className="border py-3"
-                  onClick={() => setActiveTab("reviews")}
+                  onClick={() => handleTabChange("reviews")}
                   style={{ cursor: "pointer" }}
                 >
                   <i className="bi bi-chat-left-text fs-3 text-primary"></i>

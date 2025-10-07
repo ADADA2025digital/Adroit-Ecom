@@ -79,8 +79,16 @@ export const CartProvider = ({ children }) => {
     }
   }, []);
 
+  // Auto-refresh cart every 2 seconds
   useEffect(() => {
-    fetchCart();
+    fetchCart(); // Initial fetch
+
+    const interval = setInterval(() => {
+      fetchCart();
+    }, 2000); // Refresh every 2 seconds
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval);
   }, [fetchCart]);
 
   const syncGuestCartAfterLogin = async () => {

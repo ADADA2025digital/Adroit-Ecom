@@ -250,94 +250,117 @@ const ReviewTab = ({ user, orders, fetchUserOrders, getItemImageUrl }) => {
     };
   };
 
-  // ---------- Submit Review (Real API) ----------
-  const handleSubmitReview = async (item) => {
-    const fd = reviewFormData[item.id];
-    if (!fd) {
-      Swal.fire("Error", "Review data not found. Please try again.", "error");
-      return;
+// ---------- Submit Review (Real API) ----------
+const handleSubmitReview = async (item) => {
+  const fd = reviewFormData[item.id];
+  if (!fd) {
+    Swal.fire("Error", "Review data not found. Please try again.", "error");
+    return;
+  }
+
+  const { errors, normalizedRating, productId, orderId, isValid } =
+    validateReviewData(fd);
+  if (!isValid) {
+    Swal.fire("Error", errors.join("\n"), "error");
+    return;
+  }
+
+  setIsSubmitting(true);
+  try {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Authentication token not found");
     }
 
-    const { errors, normalizedRating, productId, orderId, isValid } =
-      validateReviewData(fd);
-    if (!isValid) {
-      Swal.fire("Error", errors.join("\n"), "error");
-      return;
+    // Create FormData for multipart upload
+    const formData = new FormData();
+    
+    // Required fields
+    formData.append("product_id", productId);        // string - product identifier
+    formData.append("order_id", orderId);            // string - order identifier
+    formData.append("rating", normalizedRating.toString()); // string - rating value (0.5 to 5)
+    formData.append("comment", fd.comment.trim());   // string - review text
+
+    // Optional: images array
+    if (fd.images && fd.images.length > 0) {
+      fd.images.forEach((image, index) => {
+        formData.append("images[]", image);          // file objects - product images
+      });
     }
 
-    setIsSubmitting(true);
-    try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error("Authentication token not found");
-      }
+    // Debug: Log what's being sent (remove in production)
+    console.log("Submitting review with data:", {
+      product_id: productId,
+      order_id: orderId,
+      rating: normalizedRating,
+      comment: fd.comment.trim(),
+      image_count: fd.images?.length || 0,
+      images: fd.images?.map(img => ({
+        name: img.name,
+        type: img.type,
+        size: img.size
+      }))
+    });
 
-      // Create FormData for multipart upload
-      const formData = new FormData();
-      formData.append("product_id", productId);
-      formData.append("order_id", orderId);
-      formData.append("rating", normalizedRating.toString());
-      formData.append("comment", fd.comment.trim());
-
-      // Add images if any
-      if (fd.images && fd.images.length > 0) {
-        fd.images.forEach((image, index) => {
-          formData.append("images[]", image);
-        });
-      }
-
-      const response = await fetch(`${API_BASE_URL}/reviews/submit`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-          // Don't set Content-Type for FormData - browser will set it with boundary
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `HTTP error! status: ${response.status}, message: ${errorText}`
-        );
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.message || "Failed to submit review");
-      }
-
-      Swal.fire({
-        title: "Success!",
-        text: result.message || "Review submitted successfully",
-        icon: "success",
-        timer: 3000,
-        showConfirmButton: false,
-      });
-
-      setReviewItems((prev) => prev.filter((ri) => ri.id !== item.id));
-      setExpandedReviewId(null);
-
-      setReviewFormData((prev) => {
-        const nd = { ...prev };
-        delete nd[item.id];
-        return nd;
-      });
-    } catch (error) {
-      // console.error("Error in review submission:", error);
-
-      Swal.fire({
-        title: "Submission Error",
-        text: error.message || "Failed to submit review. Please try again.",
-        icon: "error",
-        confirmButtonText: "OK",
-      });
-    } finally {
-      setIsSubmitting(false);
+    // Log FormData entries (for debugging)
+    for (let [key, value] of formData.entries()) {
+      console.log(`FormData: ${key} =`, value);
     }
-  };
+
+    const response = await fetch(`${API_BASE_URL}/reviews/submit`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        // Don't set Content-Type for FormData - browser will set it with boundary automatically
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `HTTP error! status: ${response.status}, message: ${errorText}`
+      );
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || "Failed to submit review");
+    }
+
+    Swal.fire({
+      title: "Success!",
+      text: result.message || "Review submitted successfully",
+      icon: "success",
+      timer: 3000,
+      showConfirmButton: false,
+    });
+
+    // Remove the reviewed item from the list
+    setReviewItems((prev) => prev.filter((ri) => ri.id !== item.id));
+    setExpandedReviewId(null);
+
+    // Clean up form data
+    setReviewFormData((prev) => {
+      const nd = { ...prev };
+      delete nd[item.id];
+      return nd;
+    });
+  } catch (error) {
+    console.error("Error in review submission:", error);
+
+    Swal.fire({
+      title: "Submission Error",
+      text: error.message || "Failed to submit review. Please try again.",
+      icon: "error",
+      confirmButtonText: "OK",
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const productsToReview = Array.isArray(reviewItems) ? reviewItems : [];
   const filteredReviewItems =

@@ -15,155 +15,6 @@ const Home = () => {
   const [itemTypes, setItemTypes] = useState([]);
   const [selectedItemType, setSelectedItemType] = useState("");
 
-  // Loading flags
-  const [loadingProducts, setLoadingProducts] = useState(true);
-  const [loadingTypes, setLoadingTypes] = useState(true);
-
-  // ---- Skeletons (no spinner) ----
-  const SkeletonPill = () => (
-    <span
-      className="rounded-0 border-bottom border-3 px-2"
-      style={{
-        width: 80,
-        height: 28,
-        display: "inline-block",
-        background:
-          "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%)",
-        backgroundSize: "400% 100%",
-        animation: "shine 1.4s ease infinite",
-      }}
-      aria-hidden="true"
-    />
-  );
-
-  const SkeletonCard = () => (
-    <div className="col-lg-3 col-md-4 col-sm-6 mb-5">
-      <div className="border rounded-0 p-3 h-100">
-        <div
-          style={{
-            width: "100%",
-            height: 180,
-            borderRadius: 12,
-            background:
-              "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%)",
-            backgroundSize: "400% 100%",
-            animation: "shine 1.4s ease infinite",
-          }}
-        />
-        <div
-          className="mt-3"
-          style={{
-            width: "70%",
-            height: 16,
-            borderRadius: 6,
-            background:
-              "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%)",
-            backgroundSize: "400% 100%",
-            animation: "shine 1.4s ease infinite",
-          }}
-        />
-        <div
-          className="mt-2"
-          style={{
-            width: "50%",
-            height: 14,
-            borderRadius: 6,
-            background:
-              "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%)",
-            backgroundSize: "400% 100%",
-            animation: "shine 1.4s ease infinite",
-          }}
-        />
-        <div
-          className="mt-3"
-          style={{
-            width: "40%",
-            height: 32,
-            borderRadius: 8,
-            background:
-              "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%)",
-            backgroundSize: "400% 100%",
-            animation: "shine 1.4s ease infinite",
-          }}
-        />
-      </div>
-    </div>
-  );
-
-  // (Optional) your circular skeleton from the prompt, in case you want to reuse it:
-  const SkeletonCircle = () => (
-    <div
-      className="me-0 mb-3 border rounded-circle"
-      style={{
-        width: 150,
-        height: 150,
-        overflow: "hidden",
-        background:
-          "linear-gradient(90deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.1) 37%, rgba(0,0,0,0.05) 63%)",
-        backgroundSize: "400% 100%",
-        animation: "shine 1s ease infinite",
-      }}
-      aria-hidden="true"
-    />
-  );
-
-  // Fetch products
-  useEffect(() => {
-    const loadProducts = async () => {
-      setLoadingProducts(true);
-      try {
-        const data = await fetchProducts();
-        if (Array.isArray(data) && data.length > 0) {
-          setAllProducts(data);
-          // Show 12 latest initially
-          setProducts(data.slice(0, 12));
-        } else {
-          setAllProducts([]);
-          setProducts([]);
-          // console.error("API returned empty or invalid products:", data);
-        }
-      } catch (err) {
-        // console.error("Error fetching products:", err);
-        setAllProducts([]);
-        setProducts([]);
-      } finally {
-        setLoadingProducts(false);
-      }
-    };
-    loadProducts();
-  }, []);
-
-  // Fetch item types
-  useEffect(() => {
-    const fetchItemTypes = async () => {
-      setLoadingTypes(true);
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_API_URL}api/items/itemtypes`
-        );
-        setItemTypes(Array.isArray(response.data) ? response.data : []);
-      } catch (error) {
-        // console.error("Error fetching item types:", error);
-        setItemTypes([]);
-      } finally {
-        setLoadingTypes(false);
-      }
-    };
-    fetchItemTypes();
-  }, []);
-
-  // Filter products when item type changes
-  useEffect(() => {
-    if (!selectedItemType) {
-      setProducts(allProducts.slice(0, 12));
-      return;
-    }
-    const filtered = Array.isArray(allProducts)
-      ? allProducts.filter((product) => product?.item_type === selectedItemType)
-      : [];
-    setProducts(filtered);
-  }, [selectedItemType, allProducts]);
-
   // Carousel auto-slide
   const carouselRef = useRef(null);
   useEffect(() => {
@@ -177,16 +28,71 @@ const Home = () => {
     }
   }, []);
 
+  // Load initial data from cache instantly
+  useEffect(() => {
+    const loadInitialData = () => {
+      // Load cached products
+      const cachedProducts = JSON.parse(localStorage.getItem("cached_products") || "[]");
+      const cachedItemTypes = JSON.parse(localStorage.getItem("cached_item_types") || "[]");
+      
+      if (cachedProducts.length > 0) {
+        setAllProducts(cachedProducts);
+        setProducts(cachedProducts.slice(0, 12));
+      }
+      
+      if (cachedItemTypes.length > 0) {
+        setItemTypes(cachedItemTypes);
+      }
+    };
+
+    loadInitialData();
+    
+    // Fetch fresh data in background
+    loadProducts();
+    fetchItemTypes();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      const data = await fetchProducts();
+      if (Array.isArray(data) && data.length > 0) {
+        setAllProducts(data);
+        setProducts(data.slice(0, 12));
+        // Cache for next load
+        localStorage.setItem("cached_products", JSON.stringify(data));
+      }
+    } catch (err) {
+      // Keep cached data on error
+    }
+  };
+
+  const fetchItemTypes = async () => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}api/items/itemtypes`
+      );
+      const types = Array.isArray(response.data) ? response.data : [];
+      setItemTypes(types);
+      localStorage.setItem("cached_item_types", JSON.stringify(types));
+    } catch (error) {
+      // Keep cached item types on error
+    }
+  };
+
+  // Filter products when item type changes
+  useEffect(() => {
+    if (!selectedItemType) {
+      setProducts(allProducts.slice(0, 12));
+      return;
+    }
+    const filtered = Array.isArray(allProducts)
+      ? allProducts.filter((product) => product?.item_type === selectedItemType)
+      : [];
+    setProducts(filtered);
+  }, [selectedItemType, allProducts]);
+
   return (
     <>
-      {/* minimal CSS for skeleton shimmer */}
-      <style>{`
-        @keyframes shine {
-          0% { background-position: 100% 0; }
-          100% { background-position: 0 0; }
-        }
-      `}</style>
-
       <div className="container-fluid p-0">
         {/* ===== Hero Carousel ===== */}
         <section className="heroCarousel p-0">
@@ -340,12 +246,7 @@ const Home = () => {
 
           {/* Display Products */}
           <div className="row pt-5">
-            {loadingProducts ? (
-              // 8–12 skeleton cards to match typical grid
-              Array.from({ length: 12 }).map((_, i) => (
-                <SkeletonCard key={`sk-${i}`} />
-              ))
-            ) : Array.isArray(products) && products.length > 0 ? (
+            {Array.isArray(products) && products.length > 0 ? (
               products.map((product) => (
                 <div
                   key={
@@ -359,13 +260,18 @@ const Home = () => {
                 </div>
               ))
             ) : (
-              <p className="text-muted">No products available</p>
+              <div className="col-12 text-center py-5">
+                <p className="text-muted mb-4">No products available at the moment</p>
+                <GlobalButton to="/shop">Browse All Products</GlobalButton>
+              </div>
             )}
           </div>
 
-          <div className="d-flex justify-content-center">
-            <GlobalButton to="/shop">View More</GlobalButton>
-          </div>
+          {products.length > 0 && (
+            <div className="d-flex justify-content-center">
+              <GlobalButton to="/shop">View More</GlobalButton>
+            </div>
+          )}
         </section>
       </div>
     </>

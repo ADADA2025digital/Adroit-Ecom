@@ -23,7 +23,6 @@ const Header = ({ isLoggedIn }) => {
   // Cart
   const {
     cart,
-    isLoading,
     error,
     updateCartQuantity,
     removeFromCart,
@@ -72,7 +71,7 @@ const Header = ({ isLoggedIn }) => {
     // Don't close when opening the account dropdown
     if (target.matches("[data-bs-toggle='dropdown']")) return;
 
-    // Don’t close if it’s a purely toggling control without navigation
+    // Don't close if it's a purely toggling control without navigation
     // (we still close for Compare/Cart since we handle them below)
     closeMobileMenu();
   };
@@ -429,13 +428,7 @@ const Header = ({ isLoggedIn }) => {
           </div>
 
           <div className="offcanvas-body">
-            {isLoading ? (
-              <div className="text-center py-3">
-                <div className="spinner-border text-primary" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-              </div>
-            ) : error ? (
+            {error ? (
               <div className="alert alert-danger">{error}</div>
             ) : cartCount === 0 ? (
               <p className="text-center">Your cart is empty.</p>

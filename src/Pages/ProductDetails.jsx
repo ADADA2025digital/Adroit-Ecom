@@ -28,16 +28,58 @@ const ProductDetails = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showStickyBar, setShowStickyBar] = useState(false);
   const [reviewSummary, setReviewSummary] = useState(null);
-  const [loadingReviews, setLoadingReviews] = useState(false);
   const [showRatingTooltip, setShowRatingTooltip] = useState(false);
 
-  // Fetch product data and related products
+  // Load initial data from cache instantly
   useEffect(() => {
-    const loadProduct = async () => {
-      try {
-        const products = await fetchProducts();
-        const found = products.find((p) => String(p.id) === String(id));
+    const loadInitialData = () => {
+      // Load cached products
+      const cachedProducts = JSON.parse(localStorage.getItem("cached_products") || "[]");
+      const cachedProductDetails = JSON.parse(localStorage.getItem(`cached_product_${id}`) || "null");
+      
+      // Try to find product from cached data
+      let foundProduct = cachedProductDetails;
+      if (!foundProduct) {
+        foundProduct = cachedProducts.find((p) => String(p.id) === String(id));
+      }
+      
+      if (foundProduct) {
+        setProduct(foundProduct);
+        
+        // Set related products from cache
+        if (foundProduct && foundProduct.category) {
+          const related = cachedProducts.filter(
+            (p) =>
+              p.category &&
+              p.category.id === foundProduct.category.id &&
+              p.id !== foundProduct.id
+          );
+          setRelatedProducts(related.slice(0, 8));
+        }
+        
+        // Set initial image
+        if (foundProduct.images?.length > 0) {
+          setSelectedImage(foundProduct.images[0].imgurl);
+        }
+      }
+    };
+
+    loadInitialData();
+    
+    // Fetch fresh data in background
+    loadProduct();
+  }, [id]);
+
+  // Fetch product data and related products in background
+  const loadProduct = async () => {
+    try {
+      const products = await fetchProducts();
+      const found = products.find((p) => String(p.id) === String(id));
+      
+      if (found) {
         setProduct(found);
+        // Cache individual product
+        localStorage.setItem(`cached_product_${id}`, JSON.stringify(found));
 
         if (found && found.category) {
           const related = products.filter(
@@ -48,25 +90,31 @@ const ProductDetails = () => {
           );
           setRelatedProducts(related.slice(0, 8));
         }
-      } catch (err) {
-        // console.error("❌ Failed to load product:", err);
+        
+        // Set initial image
+        if (found.images?.length > 0) {
+          setSelectedImage(found.images[0].imgurl);
+        }
       }
-    };
+    } catch (err) {
+      // Keep cached data on error
+    }
+  };
 
-    loadProduct();
-  }, [id]);
-
-  // Fetch review summary from API
+  // Fetch review summary from API in background
   useEffect(() => {
     const fetchReviewSummary = async () => {
       if (!product?.id) return;
       
       try {
-        setLoadingReviews(true);
         // Use product_id if available, otherwise format the id
         const productId = product.product_id || `PRO${String(product.id).padStart(3, '0')}`;
         
-        // console.log(`🔄 Fetching review summary for product: ${productId}`);
+        // Check cache first
+        const cachedReview = localStorage.getItem(`cached_review_${productId}`);
+        if (cachedReview) {
+          setReviewSummary(JSON.parse(cachedReview));
+        }
         
         const response = await fetch(`https://shop.adroitalarm.com.au/api/products/${productId}/review-summary`);
         
@@ -75,36 +123,21 @@ const ProductDetails = () => {
         }
         
         const data = await response.json();
-        // console.log(`📊 API Response for ${productId}:`, data);
         
         if (data.success) {
-          // console.log(`✅ Review data for ${productId}:`, {
-          //   average_rating: data.summary.average_rating,
-          //   total_ratings: data.summary.total_ratings,
-          //   rating_breakdown: data.summary.rating_breakdown
-          // });
           setReviewSummary(data.summary);
+          // Cache review data
+          localStorage.setItem(`cached_review_${productId}`, JSON.stringify(data.summary));
         } else {
-          // console.log(`❌ API returned success: false for ${productId}`);
           setReviewSummary(null);
         }
       } catch (error) {
-        // console.error(`❌ Error fetching review summary for product ${product?.id}:`, error);
-        setReviewSummary(null);
-      } finally {
-        setLoadingReviews(false);
+        // Keep cached review data on error
       }
     };
 
     if (product) {
       fetchReviewSummary();
-    }
-  }, [product]);
-
-  // Set initial selected image
-  useEffect(() => {
-    if (product?.images?.length > 0) {
-      setSelectedImage(product.images[0].imgurl);
     }
   }, [product]);
 
@@ -255,7 +288,19 @@ const ProductDetails = () => {
   };
 
   if (!product) {
-    return <h2 className="text-center mt-5">Loading product...</h2>;
+    return (
+      <div className="container-fluid p-0">
+        <PageHeader title="Product Details" path="Home / Products" />
+        <div className="container py-5">
+          <div className="text-center py-5">
+            <p className="text-muted">Product not found</p>
+            <Link to="/shop" className="btn btn-primary">
+              Continue Shopping
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const images = product.images || [];
@@ -376,11 +421,9 @@ const ProductDetails = () => {
               </div>
 
               <div className="reviews-section">
-                {/* Pass review data to Details component to avoid duplicate API calls */}
                 <Details 
                   product={product} 
                   reviewSummary={reviewSummary}
-                  loadingReviews={loadingReviews}
                 />
               </div>
             </div>
@@ -397,14 +440,7 @@ const ProductDetails = () => {
                     onMouseEnter={() => setShowRatingTooltip(true)}
                     onMouseLeave={() => setShowRatingTooltip(false)}
                   >
-                    {loadingReviews ? (
-                      <div className="d-flex align-items-center">
-                        <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
-                        <span className="text-muted small">Loading reviews...</span>
-                      </div>
-                    ) : reviewSummary && reviewSummary.total_ratings > 0 ? (
+                    {reviewSummary && reviewSummary.total_ratings > 0 ? (
                       <>
                         {/* Clickable Rating */}
                         <button 
@@ -428,10 +464,6 @@ const ProductDetails = () => {
                         >
                           {reviewSummary.total_ratings} {reviewSummary.total_ratings === 1 ? 'Review' : 'Reviews'}
                         </button>
-                        
-                       
-
-                        
                       </>
                     ) : reviewSummary && reviewSummary.total_ratings === 0 ? (
                       <>
@@ -454,8 +486,6 @@ const ProductDetails = () => {
                           <span className="ms-2 fw-bold text-dark">0.0</span>
                         </div>
                         <span className="text-muted small">0 Reviews</span>
-                        <span className="text-muted small ms-2">•</span>
-                        <span className="text-muted small">Loading failed</span>
                       </>
                     )}
                   </div>
@@ -615,8 +645,6 @@ const ProductDetails = () => {
                   style={{ maxHeight: "50px" }}
                 />
               </div>
-
-              
             </div>
           </div>
         </div>
