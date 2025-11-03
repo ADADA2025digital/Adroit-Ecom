@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../Components/PageHeader";
 import InputField from "../Components/InputField";
-import { api } from '../Config';
+import api from "../Config/api";
 import GlobalButton from "../Components/Button";
 import Swal from "sweetalert2";
 

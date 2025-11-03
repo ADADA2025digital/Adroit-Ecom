@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Swal from "sweetalert2";
-import { api } from '../Config';
+import api from '../Config/api';
 import AddressEditModal from "../Components/AddressEditModal";
 
 const AddressTab = ({ user, userAddresses: initialAddresses, onAddressesUpdate }) => {

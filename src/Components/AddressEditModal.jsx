@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { api } from '../Config';
+import api from '../Config/api';
 import Swal from "sweetalert2";
 import GlobalButton from "./Button";
 import { City, State } from "country-state-city";

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import PageHeader from "../Components/PageHeader";
-import { api } from '../Config';
+import api from '../Config/api';
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import GlobalButton from "../Components/Button";

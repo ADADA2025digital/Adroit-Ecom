@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { api } from '../Config';
+import api from '../Config/api';
 
 const Details = ({ product, reviewSummary: externalReviewSummary, loadingReviews: externalLoadingReviews }) => {
   const [internalReviewSummary, setInternalReviewSummary] = useState(null);

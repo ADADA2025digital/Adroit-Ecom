@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { api } from '../config';
+import api from '../Config/api';
 import emailjs from "@emailjs/browser";
 import { useNavigate } from "react-router-dom";
 

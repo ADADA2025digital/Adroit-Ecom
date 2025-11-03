@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Clients, carouselData, fetchProducts } from "../Constants/Data";
 import ProductCard from "../Components/ProductCard";
-import { api } from '../Config/api';
+import api from '../Config/api';
 import GlobalButton from "../Components/Button";
 import ProductCollection from "../Components/ProductCollection";
 

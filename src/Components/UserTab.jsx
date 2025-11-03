@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { api } from '../Config';
+import api from '../Config/api';
 
 const UserTab = ({ user }) => {
   // Skeleton Component

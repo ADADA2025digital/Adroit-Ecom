@@ -4,7 +4,7 @@ import Banner from "../Assets/Images/banner.png";
 import ProductCard from "../Components/ProductCard";
 import { fetchProducts } from "../Constants/Data";
 import PageBanner from "../Components/PageBanner";
-import { api } from '../Config';
+import api from '../Config/api';
 import PageLoader from "../Components/PageLoader";
 import { CgLayoutGrid } from "react-icons/cg";
 import { TfiLayoutGrid3Alt, TfiLayoutGrid4Alt } from "react-icons/tfi";

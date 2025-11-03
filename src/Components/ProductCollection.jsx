@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { api } from '../Config';
+import api from '../Config/api';
 
 const ProductCollection = () => {
   const [categories, setCategories] = useState([]);

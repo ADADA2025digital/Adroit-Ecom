@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import GlobalButton from "../Components/Button";
-import { api } from '../Config';
+import api from '../Config/api';
 
 const MIN_COMMENT_LEN = 10;
 const MAX_IMAGES = 5;

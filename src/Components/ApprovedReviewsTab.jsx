@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { api } from '../Config';
+import api from '../Config/api';
 
 const ApprovedReviewsTab = ({ user, formatDate, onRefresh }) => {
   const [reviews, setReviews] = useState(null);

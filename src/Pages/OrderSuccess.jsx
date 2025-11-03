@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from '../Config';
+import api from '../Config/api';
 import emailjs from "@emailjs/browser";
 
 function OrderSummary() {

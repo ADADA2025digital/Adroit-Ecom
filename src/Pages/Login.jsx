@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import PageHeader from "../Components/PageHeader";
-import { api } from '../Config';
+import api from '../Config/api';
 import GlobalButton from "../Components/Button";
 
 const Login = ({ setIsLoggedIn }) => {

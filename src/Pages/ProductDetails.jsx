@@ -7,7 +7,7 @@ import { useCart } from "../Components/CartContext";
 import { useCompare } from "../Components/CompareContext";
 import CompareModal from "../Components/CompareModal";
 import ProductCard from "../Components/ProductCard";
-import { api } from '../Config';
+import api from '../Config/api';
 
 const ProductDetails = () => {
   const { slugWithId } = useParams();

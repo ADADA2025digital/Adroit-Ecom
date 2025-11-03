@@ -5,7 +5,7 @@ import { useCart } from "./CartContext";
 import { useCompare } from "./CompareContext";
 import GlobalButton from "./Button";
 import { Modal } from "bootstrap";
-import { api } from '../Config';
+import api from '../Config/api';
 
 const ProductCard = ({ product }) => {
   const [quantity, setQuantity] = useState(1);
