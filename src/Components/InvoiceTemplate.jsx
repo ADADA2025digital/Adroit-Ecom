@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useReactToPrint } from "react-to-print";
 import companyLogo from "../Assets/Images/image.jpeg";
 
 const InvoiceTemplate = ({ invoiceData, onClose }) => {
   const invoiceRef = React.useRef();
 
-  const handlePrint = useReactToPrint({
+  useReactToPrint({
     content: () => invoiceRef.current,
     documentTitle: `Invoice-${invoiceData?.invoice_number || "Unknown"}`,
   });
@@ -39,12 +39,6 @@ const InvoiceTemplate = ({ invoiceData, onClose }) => {
               {/* Printable Invoice Content */}
               <div ref={invoiceRef} className="invoice-container p-4">
                 <div className="d-print-none mb-4 text-end d-flex justify-content-end">
-                  {/* <button
-                    className="btn btn-primary btn-sm rounded-0"
-                    onClick={handlePrint}
-                  >
-                    <i className="bi bi-printer me-2"></i>Print
-                  </button> */}
                   <button
                     className="btn btn-secondary btn-sm rounded-0"
                     onClick={onClose}
@@ -186,11 +180,11 @@ const InvoiceTemplate = ({ invoiceData, onClose }) => {
                             <td>{index + 1}</td>
                             <td>{item.product_name}</td>
                             <td className="text-end">
-                              ${formatCurrency(item.unit_price)}
+                              {formatCurrency(item.unit_price)}
                             </td>
                             <td className="text-center">{item.quantity}</td>
                             <td className="text-end">
-                              ${formatCurrency(item.total_price)}
+                              {formatCurrency(item.total_price)}
                             </td>
                           </tr>
                         ))}
@@ -207,7 +201,7 @@ const InvoiceTemplate = ({ invoiceData, onClose }) => {
                               <strong>Subtotal:</strong>
                             </td>
                             <td className="text-end">
-                              ${formatCurrency(invoiceData.subtotal)}
+                              {formatCurrency(invoiceData.subtotal)}
                             </td>
                           </tr>
                           <tr>
@@ -216,14 +210,6 @@ const InvoiceTemplate = ({ invoiceData, onClose }) => {
                             </td>
                             <td className="text-end">Tax included</td>
                           </tr>
-                          {/* <tr>
-                  <td>
-                    <strong>Shipping:</strong>
-                  </td>
-                  <td className="text-end">
-                    ${parseFloat(invoice.shipping_cost).toFixed(2)}
-                  </td>
-                </tr> */}
                           <tr className="table-active">
                             <td>
                               <strong>Total:</strong>

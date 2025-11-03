@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { api } from '../Config';
 import Swal from "sweetalert2";
-import GlobalButton from "./Button"; // adjust path if different
+import GlobalButton from "./Button";
 import { City, State } from "country-state-city";
-// If you already have a shared InputField component, import it:
-import InputField from "./InputField"; // adjust path
+import InputField from "./InputField";
 
 const AddressEditModal = ({ show, onClose, address, onSaved }) => {
   const [saving, setSaving] = useState(false);
@@ -54,8 +53,6 @@ const AddressEditModal = ({ show, onClose, address, onSaved }) => {
 
     try {
       setSaving(true);
-      const token = localStorage.getItem("auth_token");
-      const url = `${import.meta.env.VITE_API_URL}api/address/${address.id}/edit`;
 
       // API expects suburb => we send city as suburb
       const payload = {
@@ -66,13 +63,7 @@ const AddressEditModal = ({ show, onClose, address, onSaved }) => {
         address_type: formData.address_type || "delivery",
       };
 
-      const { data } = await axios.put(url, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        withCredentials: true,
-      });
+      const { data } = await api.put(`/address/${address.id}/edit`, payload);
 
       if (data?.status === 200) {
         Swal.fire({
@@ -87,6 +78,7 @@ const AddressEditModal = ({ show, onClose, address, onSaved }) => {
         throw new Error(data?.message || "Failed to update address");
       }
     } catch (err) {
+      console.error("Error updating address:", err);
       Swal.fire({
         title: "Error",
         text:

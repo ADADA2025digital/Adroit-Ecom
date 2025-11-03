@@ -4,7 +4,6 @@ import Swal from "sweetalert2";
 
 const RenderOrderCard = ({ 
   order, 
-  user, 
   getItemImageUrl, 
   formatDate, 
   redirectToPaymentBySummary,
@@ -67,10 +66,8 @@ const RenderOrderCard = ({
         return;
       }
 
-      const baseUrl = (import.meta?.env?.VITE_API_URL || "").replace(
-        /\/+$/,
-        ""
-      );
+      // Use the base URL from the API config for absolute URL conversion
+      const baseUrl = "https://shop.adroitalarm.com.au";
       const toAbsoluteUrl = (url) => {
         if (!url) return "";
         const s = String(url);
@@ -127,8 +124,8 @@ const RenderOrderCard = ({
       navigate("/checkout", {
         state: { buyNow: true, fromOrder: order?.id },
       });
-    } catch (error) {
-      // console.error("Buy Again failed:", error);
+    } catch {
+      // console.error("Buy Again failed:");
       Swal.fire({
         title: "Error",
         text: "Failed to process Buy Again. Please try again.",

@@ -7,7 +7,7 @@ import { useCart } from "../Components/CartContext";
 import { useCompare } from "../Components/CompareContext";
 import CompareModal from "../Components/CompareModal";
 import ProductCard from "../Components/ProductCard";
-import axios from "axios";
+import { api } from '../Config';
 
 const ProductDetails = () => {
   const { slugWithId } = useParams();
@@ -98,6 +98,7 @@ const ProductDetails = () => {
       }
     } catch (err) {
       // Keep cached data on error
+      console.error("Error loading product:", err);
     }
   };
 
@@ -116,22 +117,17 @@ const ProductDetails = () => {
           setReviewSummary(JSON.parse(cachedReview));
         }
         
-        const response = await fetch(`https://shop.adroitalarm.com.au/api/products/${productId}/review-summary`);
+        const response = await api.get(`/products/${productId}/review-summary`);
         
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          setReviewSummary(data.summary);
+        if (response.data.success) {
+          setReviewSummary(response.data.summary);
           // Cache review data
-          localStorage.setItem(`cached_review_${productId}`, JSON.stringify(data.summary));
+          localStorage.setItem(`cached_review_${productId}`, JSON.stringify(response.data.summary));
         } else {
           setReviewSummary(null);
         }
       } catch (error) {
+        console.error("Error fetching review summary:", error);
         // Keep cached review data on error
       }
     };
@@ -167,7 +163,7 @@ const ProductDetails = () => {
         </>
       );
     }
-
+  
     const stars = [];
     const fullStars = Math.floor(averageRating);
     const hasHalfStar = averageRating % 1 >= 0.5;
@@ -203,9 +199,9 @@ const ProductDetails = () => {
 
     setAddingToCart(true);
     try {
-      await addToCart(product.id, quantity, size);
+      await addToCart(product, quantity, size);
     } catch (error) {
-      // console.error("Failed to add to cart:", error);
+      console.error("Failed to add to cart:", error);
     } finally {
       setAddingToCart(false);
     }
@@ -215,7 +211,7 @@ const ProductDetails = () => {
     if (!product) return;
 
     setAddingToCart(true);
-    try {
+    try {   
       // Resolve backend product_id via API using slug
       let backendProductId = product.product_id || null;
       try {
@@ -224,15 +220,13 @@ const ProductDetails = () => {
           (slugWithId || "").lastIndexOf("-")
         );
         if (slug) {
-          const res = await axios.get(`/api/products/${slug}`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          });
-          const p = res.data?.product || res.data?.data || res.data;
+          const response = await api.get(`/products/${slug}`);
+          const p = response.data?.product || response.data?.data || response.data;
           backendProductId = p?.product_id || backendProductId;
         }
-      } catch (_) {}
+      } catch (error) {
+        console.error("Error fetching product details:", error);
+      }
 
       const buyNowItem = {
         product_id: product.product_id || product.id,
@@ -248,7 +242,7 @@ const ProductDetails = () => {
 
       navigate("/checkout", { state: { buyNow: true } });
     } catch (error) {
-      // console.error("Buy Now failed:", error);
+      console.error("Buy Now failed:", error);
       alert("Failed to process Buy Now. Please try again.");
     } finally {
       setAddingToCart(false);
@@ -268,7 +262,7 @@ const ProductDetails = () => {
   const getImagePath = (path) => {
     if (!path) return null;
     if (path.startsWith("http://") || path.startsWith("https://")) return path;
-    return `${axios.defaults.baseURL}/${path.replace(/^\/+/, "")}`;
+    return `https://shop.adroitalarm.com.au/${path.replace(/^\/+/, "")}`;
   };
 
   const nextSlide = () => {
@@ -304,9 +298,11 @@ const ProductDetails = () => {
   }
 
   const images = product.images || [];
+  
+  // CHANGED: Group images in sets of 3 instead of 2
   const groupedImages = [];
-  for (let i = 0; i < images.length; i += 2) {
-    groupedImages.push(images.slice(i, i + 2));
+  for (let i = 0; i < images.length; i += 3) {
+    groupedImages.push(images.slice(i, i + 3));
   }
 
   const itemsPerSlide = 4;
@@ -333,7 +329,7 @@ const ProductDetails = () => {
                 <img
                   src={getImagePath(selectedImage)}
                   alt={product.productname}
-                  className="img-fluid mb-3 modal-product-image object-fit-cover"
+                  className="img-fluid mb-3 modal-product-image object-fit-cover border"
                   style={{ height: "350px" }}
                 />
               </div>
@@ -376,6 +372,23 @@ const ProductDetails = () => {
                               />
                             );
                           })}
+                          
+                          {/* CHANGED: Add empty placeholders if needed to maintain consistent layout */}
+                          {group.length < 3 && 
+                            Array.from({ length: 3 - group.length }).map((_, emptyIdx) => (
+                              <div 
+                                key={`empty-${emptyIdx}`}
+                                className="img-thumbnail rounded-0"
+                                style={{
+                                  width: "100px",
+                                  height: "100px",
+                                  backgroundColor: "#f8f9fa",
+                                  border: "1px solid #dee2e6",
+                                  opacity: 0.5
+                                }}
+                              ></div>
+                            ))
+                          }
                         </div>
                       </div>
                     ))}
@@ -393,7 +406,7 @@ const ProductDetails = () => {
                           height: "40px",
                           top: "50%",
                           transform: "translateY(-50%)",
-                          left: "-20px",
+                          left: "20px",
                         }}
                       >
                         <span className="carousel-control-prev-icon" />
@@ -409,7 +422,7 @@ const ProductDetails = () => {
                           height: "40px",
                           top: "50%",
                           transform: "translateY(-50%)",
-                          right: "-20px",
+                          right: "20px",
                         }}
                       >
                         <span className="carousel-control-next-icon" />

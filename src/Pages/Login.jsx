@@ -1,29 +1,25 @@
 import React, { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import PageHeader from "../Components/PageHeader";
-import axios from "axios";
-import { useCart } from "../Components/CartContext";
+import { api } from '../Config';
 import GlobalButton from "../Components/Button";
-import PasswordResetModal from "./PasswordReset";
 
 const Login = ({ setIsLoggedIn }) => {
   const [loginInput, setLogin] = useState({
     email: "",
     password: "",
-    error_list: {},
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasSynced, setHasSynced] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // State for password visibility
-  const [showResetModal, setShowResetModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
-  const { syncGuestCartAfterLogin } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from || "/dashboard";
 
   const handleInput = (e) => {
     setLogin({ ...loginInput, [e.target.name]: e.target.value });
+    setError(""); // Clear error when user types
   };
 
   const togglePasswordVisibility = () => {
@@ -33,40 +29,44 @@ const Login = ({ setIsLoggedIn }) => {
   const loginSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
+    
     setIsSubmitting(true);
+    setError("");
 
     try {
-      await axios.get("/sanctum/csrf-cookie");
-      const res = await axios.post(`/api/login`, {
+      // Direct login call without CSRF - just like Postman
+      console.log("Sending login request:", { email: loginInput.email, password: loginInput.password });
+      
+      const res = await api.post(`/login`, {
         email: loginInput.email,
         password: loginInput.password,
       });
 
-      if (res.status === 200) {
+      console.log("Login response:", res.data);
+
+      if (res.data.token) {
+        // Store auth data based on your Postman response
         localStorage.setItem("auth_token", res.data.token);
-        localStorage.setItem("role", res.data.role);
-        localStorage.setItem("user", JSON.stringify(res.data));
+        localStorage.setItem("user", JSON.stringify(res.data.data));
+        localStorage.setItem("role", res.data.data.role_id);
+        
         setIsLoggedIn(true);
-        // console.log("✅ Logged in successfully");
-
-        if (!hasSynced) {
-          await syncGuestCartAfterLogin();
-          setHasSynced(true);
-          // console.log("✅ Guest cart synced.");
-        }
-
+        console.log("Login successful, navigating to:", from);
         navigate(from, { replace: true });
-      } else if (res.status === 401) {
-        alert("Invalid credentials. Please try again.");
-      } else {
-        setLogin({ ...loginInput, error_list: res.data.errors || {} });
       }
     } catch (error) {
-      // console.error("❌ Login error:", error);
-      setLogin({
-        ...loginInput,
-        error_list: error.response?.data?.errors || {},
-      });
+      console.error("Login error:", error);
+      
+      // Set user-friendly error message
+      if (error.response?.data?.message) {
+        setError(error.response.data.message);
+      } else if (error.response?.status === 401) {
+        setError("Invalid email or password");
+      } else if (error.response?.status === 404) {
+        setError("Service not available. Please try again later.");
+      } else {
+        setError("Login failed. Please check your credentials and try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -80,6 +80,14 @@ const Login = ({ setIsLoggedIn }) => {
           <div className="col-md-6">
             <h2 className="mb-4 text-uppercase heading">LOGIN</h2>
             <div className="p-4 border bg-light shadow-sm">
+              
+              {/* Error Message */}
+              {error && (
+                <div className="alert alert-danger" role="alert">
+                  {error}
+                </div>
+              )}
+
               <form onSubmit={loginSubmit}>
                 <div className="mb-3">
                   <label htmlFor="email" className="form-label">
@@ -90,15 +98,13 @@ const Login = ({ setIsLoggedIn }) => {
                     id="email"
                     name="email"
                     className="form-control rounded-0"
-                    placeholder="Email"
+                    placeholder="Enter your email"
                     value={loginInput.email}
                     onChange={handleInput}
                     required
                   />
-                  <span className="text-danger">
-                    {loginInput.error_list.email?.[0] || ""}
-                  </span>
                 </div>
+                
                 <div className="mb-3 position-relative">
                   <label htmlFor="password" className="form-label">
                     Password
@@ -109,7 +115,7 @@ const Login = ({ setIsLoggedIn }) => {
                       id="password"
                       name="password"
                       className="form-control rounded-0 border-end-0"
-                      placeholder="Password"
+                      placeholder="Enter your password"
                       value={loginInput.password}
                       onChange={handleInput}
                       required
@@ -118,10 +124,6 @@ const Login = ({ setIsLoggedIn }) => {
                       type="button"
                       className="btn border bg-white rounded-0 border-start-0"
                       onClick={togglePasswordVisibility}
-                      style={{
-                        borderTopLeftRadius: 0,
-                        borderBottomLeftRadius: 0,
-                      }}
                     >
                       <i
                         className={
@@ -132,10 +134,8 @@ const Login = ({ setIsLoggedIn }) => {
                       ></i>
                     </button>
                   </div>
-                  <span className="text-danger">
-                    {loginInput.error_list.password?.[0] || ""}
-                  </span>
                 </div>
+                
                 <div className="d-flex flex-column flex-md-row justify-content-between align-items-end">
                   <GlobalButton
                     children={isSubmitting ? "Logging in..." : "Login"}

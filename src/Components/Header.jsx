@@ -32,6 +32,13 @@ const Header = ({ isLoggedIn }) => {
     forceRefreshCart,
   } = useCart();
 
+  // Debug cart data
+  useEffect(() => {
+    console.log("Cart Data:", cart);
+    console.log("Cart Count:", cartCount);
+    console.log("Cart Total:", cartTotal);
+  }, [cart, cartCount, cartTotal]);
+
   // --- Bootstrap helpers ---
   const getOffcanvasInstance = () => {
     const el = document.getElementById("mobileMenu");
@@ -123,18 +130,92 @@ const Header = ({ isLoggedIn }) => {
   const handleRemoveFromCart = (productId) => removeFromCart(productId);
 
   const getCartItemImage = (item) => {
+    if (!item) return "/placeholder.jpg";
+    
+    // Try multiple possible image sources with proper formatting
     const imageSources = [
       item.formattedImage,
       item.images?.[0]?.imgurl,
       item.imgurl,
+      item.image,
       item.images?.[0],
       item.images,
+      item.product_image,
     ];
+    
     for (const source of imageSources) {
+      if (!source) continue;
+      
       const formatted = formatImageUrl(source);
-      if (formatted && formatted !== "/placeholder.jpg") return formatted;
+      if (formatted && 
+          formatted !== "/placeholder.jpg" && 
+          !formatted.includes("undefined") &&
+          !formatted.includes("null")) {
+        return formatted;
+      }
     }
     return "/placeholder.jpg";
+  };
+
+  // Enhanced function to extract product details with comprehensive fallbacks
+  const getProductDetails = (item) => {
+    if (!item) {
+      return {
+        id: "unknown",
+        name: "Unknown Product",
+        price: 0,
+        quantity: 1,
+        size: "M",
+        image: "/placeholder.jpg"
+      };
+    }
+
+    // Extract product name from multiple possible properties
+    const productName = 
+      item.productname || 
+      item.name || 
+      item.product_name || 
+      item.title || 
+      "Unknown Product";
+
+    // Extract quantity from multiple possible properties
+    const quantity = 
+      Number(item.pro_quantity) || 
+      Number(item.quantity) || 
+      Number(item.qty) || 
+      1;
+
+    // Extract price from multiple possible properties
+    const price = 
+      parseFloat(item.pro_price) || 
+      parseFloat(item.price) || 
+      parseFloat(item.product_price) || 
+      parseFloat(item.original_price) || 
+      0;
+
+    // Extract size from multiple possible properties
+    const size = 
+      item.size || 
+      item.product_size || 
+      "M";
+
+    // Extract ID from multiple possible properties
+    const productId = 
+      item.product_id || 
+      item.id || 
+      item.product_id || 
+      "unknown";
+
+    const imageUrl = getCartItemImage(item);
+
+    return {
+      id: productId,
+      name: productName,
+      price: price,
+      quantity: quantity,
+      size: size,
+      image: imageUrl
+    };
   };
 
   const handleCheckoutClick = () => {
@@ -434,16 +515,17 @@ const Header = ({ isLoggedIn }) => {
               <p className="text-center">Your cart is empty.</p>
             ) : (
               <>
-                {cart.map((item) => {
-                  const imageUrl = getCartItemImage(item);
+                {cart.map((item, index) => {
+                  const productDetails = getProductDetails(item);
+                  
                   return (
                     <div
-                      key={item.product_id}
+                      key={productDetails.id + '-' + index}
                       className="d-flex justify-content-between align-items-center border-bottom py-2"
                     >
                       <img
-                        src={imageUrl}
-                        alt={item.productname}
+                        src={productDetails.image}
+                        alt={productDetails.name}
                         width="70"
                         height="70"
                         style={{
@@ -458,18 +540,13 @@ const Header = ({ isLoggedIn }) => {
 
                       <div className="flex-grow-1 ms-3">
                         <p className="mb-0 fw-semibold heading">
-                          {item.productname}
+                          {productDetails.name}
                         </p>
                         <p className="mb-0 text-muted small">
-                          Size: {item.size || "M"} | Qty:{" "}
-                          {item.pro_quantity || item.quantity}
+                          Size: {productDetails.size} | Qty: {productDetails.quantity}
                         </p>
                         <p className="mb-0 text-primary fw-semibold">
-                          $
-                          {(
-                            parseFloat(item.pro_price || 0) *
-                            (item.pro_quantity || item.quantity || 0)
-                          ).toFixed(2)}
+                          ${(productDetails.price * productDetails.quantity).toFixed(2)}
                         </p>
                       </div>
 
@@ -478,19 +555,19 @@ const Header = ({ isLoggedIn }) => {
                           <button
                             className="btn btn-sm btn-light border-0 rounded-0"
                             onClick={() =>
-                              handleUpdateQuantity(item.product_id, -1)
+                              handleUpdateQuantity(productDetails.id, -1)
                             }
-                            disabled={(item.pro_quantity || item.quantity) <= 1}
+                            disabled={productDetails.quantity <= 1}
                           >
                             -
                           </button>
                           <span className="mx-2">
-                            {item.pro_quantity || item.quantity}
+                            {productDetails.quantity}
                           </span>
                           <button
                             className="btn btn-sm btn-light border-0 rounded-0"
                             onClick={() =>
-                              handleUpdateQuantity(item.product_id, 1)
+                              handleUpdateQuantity(productDetails.id, 1)
                             }
                           >
                             +
@@ -498,7 +575,7 @@ const Header = ({ isLoggedIn }) => {
                         </div>
                         <button
                           className="btn btn-sm text-danger ms-2"
-                          onClick={() => handleRemoveFromCart(item.product_id)}
+                          onClick={() => handleRemoveFromCart(productDetails.id)}
                         >
                           <i className="bi bi-trash"></i>
                         </button>

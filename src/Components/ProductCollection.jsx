@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import { api } from '../Config';
 
 const ProductCollection = () => {
   const [categories, setCategories] = useState([]);
@@ -8,34 +8,26 @@ const ProductCollection = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [firstAttemptDone, setFirstAttemptDone] = useState(false); // prevents early "No categories"
 
-  // API Base URL (fallback + ensure trailing slash)
-  const API_BASE_RAW = import.meta.env.VITE_API_URL;
-  const API_BASE = (API_BASE_RAW.endsWith("/") ? API_BASE_RAW : API_BASE_RAW + "/");
-
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("auth_token");
-    return {
-      Authorization: token ? `Bearer ${token}` : "",
-      "Content-Type": "application/json",
-    };
-  };
-
   const fetchCategories = async () => {
-    const token = localStorage.getItem("auth_token");
-    const res = await axios.get(`${API_BASE}api/getcategory`, {
-      headers: { Authorization: token ? `Bearer ${token}` : "" },
-      withCredentials: true,
-    });
-    if (res.status !== 200) throw new Error("Failed to fetch categories");
-    return Array.isArray(res.data) ? res.data : [];
+    try {
+      const response = await api.get("/getcategory");
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+      throw new Error("Failed to fetch categories");
+    }
   };
 
   const fetchProducts = async () => {
-    const res = await fetch(`${API_BASE}api/products`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error("Failed to fetch products");
-    const data = await res.json();
-    const list = data?.products ?? data ?? [];
-    return Array.isArray(list) ? list : [];
+    try {
+      const response = await api.get("/products");
+      const data = response.data;
+      const list = data?.products ?? data ?? [];
+      return Array.isArray(list) ? list : [];
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+      throw new Error("Failed to fetch products");
+    }
   };
 
   // Incremental load — set each dataset as soon as it arrives
@@ -45,15 +37,13 @@ const ProductCollection = () => {
     try {
       const catsP = fetchCategories()
         .then((cats) => setCategories(cats))
-        .catch((e) => {
-          // console.error("Categories error:", e);
+        .catch(() => {
           setError((prev) => prev ?? "Failed to load categories.");
         });
 
       const prodsP = fetchProducts()
         .then((prods) => setProducts(prods))
-        .catch((e) => {
-          // console.error("Products error:", e);
+        .catch(() => {
           setError((prev) => prev ?? "Failed to load products.");
         });
 
@@ -68,7 +58,7 @@ const ProductCollection = () => {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retryCount, API_BASE]);
+  }, [retryCount]);
 
   // Helpers
   const normalizeImageUrl = (p) => {

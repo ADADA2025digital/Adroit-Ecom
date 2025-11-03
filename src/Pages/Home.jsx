@@ -1,14 +1,11 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Clients, carouselData, fetchProducts } from "../Constants/Data";
 import ProductCard from "../Components/ProductCard";
-import axios from "axios";
+import { api } from '../config';
 import GlobalButton from "../Components/Button";
 import ProductCollection from "../Components/ProductCollection";
 
 const Home = () => {
-  const BASE_URL =
-    import.meta.env.VITE_API_URL || "https://shop.adroitalarm.com.au/";
-
   // Data state
   const [products, setProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
@@ -63,18 +60,18 @@ const Home = () => {
       }
     } catch (err) {
       // Keep cached data on error
+      console.error("Error loading products:", err);
     }
   };
 
   const fetchItemTypes = async () => {
     try {
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}api/items/itemtypes`
-      );
+      const response = await api.get("/items/itemtypes");
       const types = Array.isArray(response.data) ? response.data : [];
       setItemTypes(types);
       localStorage.setItem("cached_item_types", JSON.stringify(types));
     } catch (error) {
+      console.error("Error fetching item types:", error);
       // Keep cached item types on error
     }
   };

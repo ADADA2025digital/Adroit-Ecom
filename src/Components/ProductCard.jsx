@@ -5,6 +5,7 @@ import { useCart } from "./CartContext";
 import { useCompare } from "./CompareContext";
 import GlobalButton from "./Button";
 import { Modal } from "bootstrap";
+import { api } from '../Config';
 
 const ProductCard = ({ product }) => {
   const [quantity, setQuantity] = useState(1);
@@ -35,18 +36,15 @@ const ProductCard = ({ product }) => {
         const productIdString = String(product.id);
         const productId = productIdString.startsWith('PRO') ? productIdString : `PRO${productIdString.padStart(3, '0')}`;
         
-        const response = await fetch(`https://shop.adroitalarm.com.au/api/products/${productId}/review-summary`);
+        const response = await api.get(`/products/${productId}/review-summary`);
         
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          setReviewSummary(data.summary);
+        if (response.data.success) {
+          setReviewSummary(response.data.summary);
+        } else {
+          setReviewSummary(null);
         }
       } catch (error) {
+        console.error("Error fetching review summary:", error);
         setReviewSummary(null);
       } finally {
         setLoadingReviews(false);
@@ -112,6 +110,7 @@ const ProductCard = ({ product }) => {
       await addToCart(product, quantity, selectedSize);
       safeHideModalById(modalId);
     } catch (error) {
+      console.error("Failed to add item to cart:", error);
       alert("Failed to add item to cart. Please try again.");
     }
   };
@@ -428,4 +427,4 @@ const ProductCard = ({ product }) => {
   );
 };
 
-export default ProductCard;  
+export default ProductCard;

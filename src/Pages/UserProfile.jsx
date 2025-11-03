@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { useNavigate } from "react-router-dom";
 import PageHeader from "../Components/PageHeader";
 import InputField from "../Components/InputField";
-import axios from "axios";
+import { api } from '../Config';
 import GlobalButton from "../Components/Button";
 import Swal from "sweetalert2";
 
@@ -18,8 +18,7 @@ const UserProfile = () => {
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const [userData, setUserData] = useState(null);
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
 
   // Fetch user data on component mount
   useEffect(() => {
@@ -28,12 +27,11 @@ const UserProfile = () => {
 
   const fetchUserProfile = async () => {
     try {
-      const response = await axios.get("/api/auth/user");
+      const response = await api.get("/auth/user");
+      
       if (response.data && response.data.user) {
         const user = response.data.user;
-        setUserData(user);
         setFormData({
-          firstname: user.firstname || "",
           lastname: user.lastname || "",
           phone: user.phone || "",
           email: user.email || "",
@@ -43,13 +41,21 @@ const UserProfile = () => {
         });
       }
     } catch (error) {
+      console.error("Error fetching user profile:", error);
+      
+      let errorMessage = "Failed to fetch user profile.";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 401) {
+        errorMessage = "Authentication failed. Please log in again.";
+      }
+
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Failed to fetch user profile.",
+        text: errorMessage,
         confirmButtonColor: "#3085d6",
       });
-      // console.error("Error fetching user profile:", error);
     }
   };
 
@@ -66,7 +72,7 @@ const UserProfile = () => {
     setIsLoading(true);
 
     // Validate password confirmation
-    if (formData.new_password !== formData.new_password_confirmation) {
+    if (formData.new_password && formData.new_password !== formData.new_password_confirmation) {
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -88,27 +94,17 @@ const UserProfile = () => {
         delete dataToSend.new_password_confirmation;
       }
 
-      const response = await axios.post(
-        "https://shop.adroitalarm.com.au/api/profile/edit",
-        dataToSend,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          },
-        }
-      );
+      const response = await api.post("/profile/edit", dataToSend);
 
       // Show success message with SweetAlert2 and then navigate to dashboard
       Swal.fire({
         icon: "success",
         title: "Success!",
-        text: "Profile updated successfully!",
+        text: response.data?.message || "Profile updated successfully!",
         confirmButtonColor: "#3085d6",
       }).then((result) => {
         if (result.isConfirmed) {
-          navigate("/dashboard"); // Navigate to dashboard after user clicks OK
+          navigate("/dashboard");
         }
       });
 
@@ -120,17 +116,21 @@ const UserProfile = () => {
         new_password_confirmation: "",
       }));
     } catch (error) {
-      // console.error("Error updating profile:", error);
+      console.error("Error updating profile:", error);
 
       // Show error message with SweetAlert2
       let errorMessage = "An error occurred while updating the profile.";
 
-      if (
-        error.response &&
-        error.response.data &&
-        error.response.data.message
-      ) {
+      if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
+      } else if (error.response?.status === 401) {
+        errorMessage = "Authentication failed. Please log in again.";
+      } else if (error.response?.status === 422) {
+        // Handle validation errors
+        const validationErrors = error.response.data.errors;
+        if (validationErrors) {
+          errorMessage = Object.values(validationErrors).flat().join(', ');
+        }
       }
 
       Swal.fire({

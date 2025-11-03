@@ -4,7 +4,7 @@ import Banner from "../Assets/Images/banner.png";
 import ProductCard from "../Components/ProductCard";
 import { fetchProducts } from "../Constants/Data";
 import PageBanner from "../Components/PageBanner";
-import axios from "axios";
+import { api } from '../Config';
 import PageLoader from "../Components/PageLoader";
 import { CgLayoutGrid } from "react-icons/cg";
 import { TfiLayoutGrid3Alt, TfiLayoutGrid4Alt } from "react-icons/tfi";
@@ -16,10 +16,9 @@ const Shop = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isOpen, setIsOpen] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [error, setError] = useState(null);
   const [products, setProducts] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [imageLoading, setImageLoading] = useState(true);
+  // Removed unused imageLoading state
   const [gridView, setGridView] = useState("grid-4");
   const [loading, setLoading] = useState(true);
 
@@ -94,11 +93,11 @@ const Shop = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get("/api/getcategory");
+        const response = await api.get("/getcategory");
         setCategories(response.data);
       } catch (err) {
-        setError(err.message);
-      } finally {
+        console.error("Error fetching categories:", err);
+        // Optionally handle error here (e.g., show a toast or log)
         setTimeout(hideLoader, 1000);
       }
     };
@@ -107,7 +106,7 @@ const Shop = () => {
   }, []);
 
   useEffect(() => {
-    // console.log("🔥 Products State Changed:", products);
+    console.log("🔥 Products State Changed:", products);
   }, [products]);
 
   useEffect(() => {
@@ -115,17 +114,17 @@ const Shop = () => {
       setLoading(true);
       try {
         const data = await fetchProducts();
-        // console.log("Fetched Products:", data);
+        console.log("Fetched Products:", data);
 
         if (data.length === 0) {
-          // console.warn("⚠️ No products found, state is empty");
+          console.warn("⚠️ No products found, state is empty");
         } else {
-          // console.log("✅ Setting products state:", data);
+          console.log("✅ Setting products state:", data);
         }
 
         setProducts(data);
       } catch (err) {
-        // console.error("❌ Error fetching products:", err);
+        console.error("❌ Error fetching products:", err);
         setProducts([]);
       } finally {
         setLoading(false);
@@ -141,11 +140,9 @@ const Shop = () => {
       try {
         if (selectedCategories.length > 0) {
           const categoryParam = selectedCategories.join(",");
-          const response = await axios.get(
-            `/api/category/${categoryParam}/products`
-          );
+          const response = await api.get(`/category/${categoryParam}/products`);
 
-          // console.log("✅ API Response:", response.data);
+          console.log("✅ API Response:", response.data);
 
           const productsWithImages = response.data.map((product) => ({
             ...product,
@@ -163,7 +160,9 @@ const Shop = () => {
           setProducts(data);
         }
       } catch (err) {
-        setError(err.message);
+        console.error("Error fetching products by category:", err);
+        console.error("Error fetching products by category:", err);
+        // Optionally handle error here (e.g., show a toast or log)
       } finally {
         setLoading(false);
         setTimeout(hideLoader, 1000);
@@ -374,7 +373,6 @@ const Shop = () => {
 
           {/* Grid View Selector */}
           <div className="d-none d-md-flex justify-content-start align-items-center mt-2">
-            {/* <span className="me-2 text-muted heading">View:</span> */}
             <div
               className="btn-group bg-light border p-2 rounded-0"
               role="group"

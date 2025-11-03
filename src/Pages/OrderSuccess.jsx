@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { api } from '../Config';
 import emailjs from "@emailjs/browser";
 
 function OrderSummary() {
@@ -16,7 +16,7 @@ function OrderSummary() {
   const emailTriggeredRef = useRef(false);
 
   useEffect(() => {
-    emailjs.init(import.meta.env.VITE_EMAILJS_PUBLIC_KEY);
+    emailjs.init("x81NpKL7Q438yTjZK"); // Your EmailJS public key
   }, []);
 
   const hasEmailBeenSent = (orderId) => {
@@ -36,7 +36,7 @@ function OrderSummary() {
     }
 
     if (!orderData.user_details?.email) {
-      // console.warn("No email address available for order confirmation");
+      console.warn("No email address available for order confirmation");
       return;
     }
 
@@ -79,15 +79,15 @@ function OrderSummary() {
       };
 
       await emailjs.send(
-        import.meta.env.VITE_EMAILJS_SERVICE_ID,
-        import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+        "service_icsecqd", // Your EmailJS service ID
+        "template_2azoziq", // Your EmailJS template ID
         templateParams
       );
 
       markEmailAsSent(orderId);
       setEmailStatus({ sent: true, sending: false, error: null });
     } catch (error) {
-      // console.error("Email sending failed:", error);
+      console.error("Email sending failed:", error);
       setEmailStatus({ sent: false, sending: false, error: "Failed to send confirmation email" });
     }
   };
@@ -95,7 +95,6 @@ function OrderSummary() {
   useEffect(() => {
     const fetchOrderSummary = async () => {
       try {
-        const token = localStorage.getItem("auth_token");
         const orderId = localStorage.getItem("latest_order_id");
 
         if (!orderId) {
@@ -103,10 +102,7 @@ function OrderSummary() {
           return;
         }
 
-        const response = await axios.get(
-          `${import.meta.env.VITE_API_URL}api/orders/${orderId}/summary`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const response = await api.get(`/orders/${orderId}/summary`);
 
         if (response.data.success && response.data.order_summary) {
           const summary = response.data.order_summary;
@@ -119,14 +115,20 @@ function OrderSummary() {
           ) {
             emailTriggeredRef.current = true;
             await sendConfirmationEmail(summary);
-            // console.log('email sent triggered');
+            console.log('email sent triggered');
           }
         } else {
           setError("Failed to load order summary");
         }
       } catch (err) {
-        // console.error("Error fetching order summary:", err);
-        setError("Failed to load order details. Please try again later.");
+        console.error("Error fetching order summary:", err);
+        let errorMessage = "Failed to load order details. Please try again later.";
+        if (err.response?.status === 401) {
+          errorMessage = "Authentication failed. Please log in again.";
+        } else if (err.response?.data?.message) {
+          errorMessage = err.response.data.message;
+        }
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

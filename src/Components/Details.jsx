@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { api } from '../Config';
 
 const Details = ({ product, reviewSummary: externalReviewSummary, loadingReviews: externalLoadingReviews }) => {
-  const [activeTab, setActiveTab] = useState("Description");
   const [internalReviewSummary, setInternalReviewSummary] = useState(null);
   const [internalLoadingReviews, setInternalLoadingReviews] = useState(false);
   const [reviews, setReviews] = useState([]);
@@ -10,10 +10,10 @@ const Details = ({ product, reviewSummary: externalReviewSummary, loadingReviews
   const reviewSummary = externalReviewSummary !== undefined ? externalReviewSummary : internalReviewSummary;
   const loadingReviews = externalLoadingReviews !== undefined ? externalLoadingReviews : internalLoadingReviews;
 
-  if (!product) return null;
-
   // Only fetch internally if external data is not provided
   useEffect(() => {
+    if (!product) return;
+
     if (externalReviewSummary === undefined && externalLoadingReviews === undefined) {
       const fetchReviewSummary = async () => {
         if (!product?.product_id) return;
@@ -22,25 +22,21 @@ const Details = ({ product, reviewSummary: externalReviewSummary, loadingReviews
           setInternalLoadingReviews(true);
           const productId = product.product_id;
           
-          const response = await fetch(`https://shop.adroitalarm.com.au/api/products/${productId}/review-summary`);
+          const response = await api.get(`/products/${productId}/review-summary`);
           
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          
-          if (data.success) {
-            setInternalReviewSummary(data.summary);
+          if (response.data.success) {
+            setInternalReviewSummary(response.data.summary);
             
-            if (data.summary.total_ratings > 0) {
+            if (response.data.summary.total_ratings > 0) {
               await fetchProductReviews(productId);
             } else {
               setReviews([]);
             }
+          } else {
+            throw new Error("Failed to fetch review summary");
           }
         } catch (error) {
-          // console.error("Error fetching review summary:", error);
+          console.error("Error fetching review summary:", error);
           setInternalReviewSummary({
             average_rating: 0,
             total_ratings: 0,
@@ -56,20 +52,15 @@ const Details = ({ product, reviewSummary: externalReviewSummary, loadingReviews
       // Fetch actual product reviews
       const fetchProductReviews = async (productId) => {
         try {
-          const response = await fetch(`https://shop.adroitalarm.com.au/api/products/${productId}/reviews`);
+          const response = await api.get(`/products/${productId}/reviews`);
           
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.reviews && data.reviews.length > 0) {
-              setReviews(data.reviews);
-            } else {
-              createPlaceholderReviews();
-            }
+          if (response.data.success && response.data.reviews && response.data.reviews.length > 0) {
+            setReviews(response.data.reviews);
           } else {
             createPlaceholderReviews();
           }
         } catch (error) {
-          // console.error("Error fetching detailed reviews:", error);
+          console.error("Error fetching detailed reviews:", error);
           createPlaceholderReviews();
         }
       };
@@ -117,13 +108,7 @@ const Details = ({ product, reviewSummary: externalReviewSummary, loadingReviews
 
       fetchReviewSummary();
     }
-  }, [product?.product_id, externalReviewSummary, externalLoadingReviews]);
-
-  // Rest of your existing Details component code remains the same...
-  // [Keep all your existing functions: handleTabClick, renderStars, renderRatingBars, calculateRatingDistribution]
-  // [Keep your existing return JSX]
-
-  const handleTabClick = (tab) => setActiveTab(tab);
+  }, [product, product?.product_id, externalReviewSummary, externalLoadingReviews, internalReviewSummary]);
 
   const renderStars = (rating) => {
     if (typeof rating !== 'number') return null;
@@ -228,6 +213,8 @@ const Details = ({ product, reviewSummary: externalReviewSummary, loadingReviews
     
     return distribution;
   };
+
+  if (!product) return null;
 
   return (
     <>

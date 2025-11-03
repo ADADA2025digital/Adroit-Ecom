@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import { api } from '../config';
 import emailjs from "@emailjs/browser";
 import { useNavigate } from "react-router-dom";
 
@@ -25,7 +25,7 @@ const PasswordReset = () => {
   // Function to send email using EmailJS
   const sendEmailWithEmailJS = async (email, otpCode, resetToken) => {
     try {
-      // console.log("Sending email via EmailJS to:", email);
+      console.log("Sending email via EmailJS to:", email);
       
       // Prepare the template parameters
       const templateParams = {
@@ -36,7 +36,7 @@ const PasswordReset = () => {
         year: new Date().getFullYear()
       };
 
-      // console.log("EmailJS template params:", templateParams);
+      console.log("EmailJS template params:", templateParams);
       
       // Send the email
       const response = await emailjs.send(
@@ -46,10 +46,10 @@ const PasswordReset = () => {
         EMAILJS_CONFIG.PUBLIC_KEY
       );
       
-      // console.log("EmailJS response:", response);
+      console.log("EmailJS response:", response);
       return { success: true, message: "Email sent successfully" };
     } catch (error) {
-      // console.error("EmailJS error:", error);
+      console.error("EmailJS error:", error);
       return { 
         success: false, 
         message: error.text || "Failed to send email. Please try again." 
@@ -70,13 +70,10 @@ const PasswordReset = () => {
     }
 
     try {
-      // console.log("Making API call to /api/forgot-password");
-      const response = await axios.post(
-        "https://shop.adroitalarm.com.au/api/forgot-password",
-        { email }
-      );
+      console.log("Making API call to /forgot-password");
+      const response = await api.post("/forgot-password", { email });
 
-      // console.log("API Response:", response.data);
+      console.log("API Response:", response.data);
 
       if (response.data.status === 200) {
         setToken(response.data.token);
@@ -91,7 +88,7 @@ const PasswordReset = () => {
         if (emailResult.success) {
           setStep(2);
           setSuccess("OTP sent to your email address. Check your spam folder if not received.");
-          // console.log("OTP sent successfully via EmailJS");
+          console.log("OTP sent successfully via EmailJS");
         } else {
           setError(emailResult.message);
         }
@@ -99,8 +96,18 @@ const PasswordReset = () => {
         setError(response.data.message || "Failed to send OTP");
       }
     } catch (error) {
-      // console.error("API Error:", error);
-      setError(error.response?.data?.message || "Failed to process your request. Please try again.");
+      console.error("API Error:", error);
+      
+      let errorMessage = "Failed to process your request. Please try again.";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 404) {
+        errorMessage = "Email not found. Please check your email address.";
+      } else if (error.response?.status === 422) {
+        errorMessage = "Invalid email format. Please enter a valid email address.";
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -136,19 +143,16 @@ const PasswordReset = () => {
     setIsLoading(true);
 
     try {
-      // console.log("Making API call to /api/reset-password");
-      const response = await axios.post(
-        "https://shop.adroitalarm.com.au/api/reset-password",
-        {
-          email,
-          otp,
-          token,
-          password: newPassword,
-          password_confirmation: confirmPassword,
-        }
-      );
+      console.log("Making API call to /reset-password");
+      const response = await api.post("/reset-password", {
+        email,
+        otp,
+        token,
+        password: newPassword,
+        password_confirmation: confirmPassword,
+      });
 
-      // console.log("API Response:", response.data);
+      console.log("API Response:", response.data);
 
       if (response.data.status === 200) {
         setSuccess("Password reset successfully!");
@@ -159,8 +163,22 @@ const PasswordReset = () => {
         setError(response.data.message || "Failed to reset password");
       }
     } catch (error) {
-      // console.error("API Error:", error);
-      setError(error.response?.data?.message || "Failed to reset password");
+      console.error("API Error:", error);
+      
+      let errorMessage = "Failed to reset password";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 400) {
+        errorMessage = "Invalid OTP or token. Please try again.";
+      } else if (error.response?.status === 422) {
+        // Handle validation errors
+        const validationErrors = error.response.data.errors;
+        if (validationErrors) {
+          errorMessage = Object.values(validationErrors).flat().join(', ');
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

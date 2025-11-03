@@ -23,7 +23,7 @@ function useResponsiveCols() {
 }
 
 const CompareModal = () => {
-  const { items, remove, clear } = useCompare();
+  const { items, remove, } = useCompare();
   const { formatImageUrl } = useCart?.() || { formatImageUrl: (u) => u };
 
   const COLS = useResponsiveCols();           // ✅ use responsive COLS

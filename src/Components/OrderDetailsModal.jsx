@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+import { api } from '../Config';
 
 const OrderDetailsModal = ({
   showOrderModal,
@@ -19,10 +20,59 @@ const OrderDetailsModal = ({
   const [reviewedItems, setReviewedItems] = useState(new Set());
   const [selectedReason, setSelectedReason] = useState("");
   const [customReason, setCustomReason] = useState("");
+  
+  // Live order data state
+  const [liveOrderData, setLiveOrderData] = useState(null);
+  const [pollingInterval, setPollingInterval] = useState(null);
 
-  if (!selectedOrder || !selectedOrder.fullData) return null;
+  // Set up live updates when modal opens
+  useEffect(() => {
+    // Fetch live order data
+    const fetchLiveOrderData = async () => {
+      if (!selectedOrder?.id) return;
 
-  const order = selectedOrder.fullData;
+      try {
+        const response = await api.get(`/orders/${selectedOrder.id}`);
+        
+        if (response.data.success) {
+          setLiveOrderData(response.data.data);
+        }
+      } catch (err) {
+        console.error("Error fetching live order data:", err);
+      }
+    };
+    if (showOrderModal && selectedOrder) {
+      // Fetch initial data
+      fetchLiveOrderData();
+
+      // Set up polling for live updates
+      const interval = setInterval(() => {
+        fetchLiveOrderData();
+      }, 15000); // Poll every 15 seconds for order updates
+
+      setPollingInterval(interval);
+
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+      };
+    }
+  }, [showOrderModal, selectedOrder]);
+
+  // Clean up polling when modal closes
+  useEffect(() => {
+    if (!showOrderModal && pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+  }, [showOrderModal]);
+
+  // Use live data if available, otherwise use the original selectedOrder
+  const order = liveOrderData || selectedOrder?.fullData;
+  
+  if (!order) return null;
+
   const isShipped = (order.orderstatus ?? "").toLowerCase() === "shipped";
   const isPaid = order.payment_status === "paid";
 
@@ -39,8 +89,6 @@ const OrderDetailsModal = ({
     if (redirectToPaymentBySummary) {
       redirectToPaymentBySummary(orderId);
     } else {
-      // console.warn("redirectToPaymentBySummary function not provided");
-      // Fallback: navigate to payments page
       navigate("/payment", { state: { orderId } });
     }
   };
@@ -245,17 +293,8 @@ const OrderDetailsModal = ({
 
     // Enhanced mock for development
     if (import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_API === "true") {
-      //  console.log("MOCK: Would submit review:", {
-      //   product_id: item.product_id || item.id,
-      //   rating: Math.round(reviewData[itemIndex].rating),
-      //   comment: reviewData[itemIndex].comment,
-      //   order_id: order.order_id,
-      //   image_count: reviewData[itemIndex].images?.length || 0,
-      // });
-
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Simulate random success/failure for testing
       const shouldSucceed = Math.random() > 0.3;
 
       if (shouldSucceed) {
@@ -303,107 +342,21 @@ const OrderDetailsModal = ({
         reviewData[itemIndex].images &&
         reviewData[itemIndex].images.length > 0
       ) {
-        reviewData[itemIndex].images.forEach((image, idx) => {
+        reviewData[itemIndex].images.forEach((image) => {
           if (image instanceof File) {
             formData.append("images[]", image);
           }
         });
       }
 
-      const token = localStorage.getItem("auth_token");
-      if (!token) {
-        throw new Error("Authentication token not found. Please log in again.");
-      }
-
-      //  console.log("Submitting review with data:", {
-      //   product_id: productId,
-      //   rating: roundedRating,
-      //   comment_length: reviewData[itemIndex].comment.length,
-      //   order_id: orderId,
-      //   image_count: reviewData[itemIndex].images?.length || 0,
-      // });
-
-      const API_URL = import.meta.env.VITE_API_URL;
-      if (!API_URL) {
-        throw new Error("Configuration error: API URL not found");
-      }
-
-      const baseUrl = API_URL.endsWith("/") ? API_URL : `${API_URL}/`;
-      const fullUrl = `${baseUrl}api/reviews/submit`;
-
-      // console.log("Making request to:", fullUrl);
-
-      const response = await fetch(fullUrl, {
-        method: "POST",
+      // Use the centralized API instance for form data
+      const response = await api.post("/reviews/submit", formData, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
         },
-        body: formData,
       });
 
-      // Improved response handling
-      let result;
-      try {
-        const responseText = await response.text();
-        // console.log("Raw server response:", responseText);
-
-        if (!responseText) {
-          throw new Error("Empty response from server");
-        }
-
-        result = JSON.parse(responseText);
-      } catch (parseError) {
-        // console.error("Failed to parse server response:", parseError);
-        throw new Error(
-          `Server returned invalid response: ${response.status} ${response.statusText}`
-        );
-      }
-
-      if (!response.ok) {
-        //  console.error("Server error details:", {
-        //   status: response.status,
-        //   statusText: response.statusText,
-        //   response: result,
-        // });
-
-        let errorMessage =
-          result?.message || `HTTP error! status: ${response.status}`;
-
-        // Handle specific status codes
-        switch (response.status) {
-          case 400:
-            errorMessage =
-              result?.message || "Bad request. Please check your input.";
-            break;
-          case 401:
-            errorMessage = "Authentication failed. Please log in again.";
-            break;
-          case 403:
-            errorMessage =
-              result?.message ||
-              "You don't have permission to perform this action.";
-            break;
-          case 404:
-            errorMessage = result?.message || "Review endpoint not found.";
-            break;
-          case 422:
-            const validationErrors = result.errors
-              ? Object.values(result.errors).flat().join(", ")
-              : result.message;
-            errorMessage = `Validation error: ${validationErrors}`;
-            break;
-          case 500:
-            errorMessage =
-              result?.message || "Server error. Please try again later.";
-            break;
-          default:
-            errorMessage =
-              result?.message ||
-              `Request failed with status ${response.status}`;
-        }
-
-        throw new Error(errorMessage);
-      }
+      const result = response.data;
 
       if (result.success) {
         Swal.fire({
@@ -429,8 +382,6 @@ const OrderDetailsModal = ({
         throw new Error(result.message || "Failed to submit review");
       }
     } catch (error) {
-      // console.error("Review submission failed:", error);
-
       const userFriendlyMessage = getErrorMessage(error);
 
       if (
@@ -455,7 +406,6 @@ const OrderDetailsModal = ({
           icon: "error",
           confirmButtonColor: "#0d6efd",
           willClose: () => {
-            // Keep the review form open so user can fix errors
             setIsSubmitting(false);
           },
         });
@@ -467,10 +417,7 @@ const OrderDetailsModal = ({
 
   const handleBuyAgain = async () => {
     try {
-      // console.log("Buy Again clicked for order:", selectedOrder);
-
       const firstItem = selectedOrder.fullData?.items?.[0];
-      // console.log("First item:", firstItem);
 
       if (!firstItem) {
         Swal.fire({
@@ -482,10 +429,8 @@ const OrderDetailsModal = ({
         return;
       }
 
-      const baseUrl = (import.meta?.env?.VITE_API_URL || "").replace(
-        /\/+$/,
-        ""
-      );
+      // Use the base URL from the API config for absolute URL conversion
+      const baseUrl = "https://shop.adroitalarm.com.au";
       const toAbsoluteUrl = (url) => {
         if (!url) return "";
         const s = String(url);
@@ -531,9 +476,6 @@ const OrderDetailsModal = ({
         _originalItem: firstItem,
       };
 
-      // console.log("BuyAgain -> Final payload:", buyNowItem);
-      // console.log("BuyAgain -> Image URL:", imageUrl);
-
       localStorage.setItem("buy_now_item", JSON.stringify(buyNowItem));
 
       setShowOrderModal(false);
@@ -541,10 +483,9 @@ const OrderDetailsModal = ({
         state: { buyNow: true, fromOrder: selectedOrder?.id },
       });
     } catch (error) {
-      // console.error("Buy Again failed:", error);
       Swal.fire({
         title: "Error",
-        text: "Failed to process Buy Again. Please try again.",
+        text: error.message || "Failed to process Buy Again. Please try again.",
         icon: "error",
         confirmButtonColor: "#0d6efd",
       });
@@ -565,23 +506,12 @@ const OrderDetailsModal = ({
     }
 
     try {
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}api/orders/cancel/request`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            order_id: selectedOrder.id,
-            reason: reason,
-          }),
-        }
-      );
+      const response = await api.post("/orders/cancel/request", {
+        order_id: selectedOrder.id,
+        reason: reason,
+      });
 
-      const result = await response.json();
+      const result = response.data;
 
       if (result.success) {
         Swal.fire({
@@ -592,13 +522,12 @@ const OrderDetailsModal = ({
         });
 
         setShowOrderModal(false);
-        fetchUserOrders();
-        fetchCancellations();
+        if (fetchUserOrders) fetchUserOrders();
+        if (fetchCancellations) fetchCancellations();
       } else {
         throw new Error(result.message || "Failed to cancel order");
       }
     } catch (error) {
-      // console.error("Cancellation error:", error);
       Swal.fire({
         title: "Error",
         text: error.message || "Failed to process cancellation",
@@ -856,11 +785,19 @@ const OrderDetailsModal = ({
                         {/* Right column with buttons */}
                         <div className="col-md-4 od-actions d-flex flex-column justify-content-center text-center">
                           <button
-                            className="btn btn-outline-dark btn-sm w-100 rounded-0"
+                            className="btn btn-outline-dark btn-sm w-100 rounded-0 mb-2"
                             onClick={handleBuyAgain}
                           >
                             Buy this again
                           </button>
+                          {!isItemReviewed && (
+                            <button
+                              className="btn btn-outline-primary btn-sm w-100 rounded-0"
+                              onClick={() => toggleReviewSection(index)}
+                            >
+                              Write Review
+                            </button>
+                          )}
                         </div>
                       </div>
 

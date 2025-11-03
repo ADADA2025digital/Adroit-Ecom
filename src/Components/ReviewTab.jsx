@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import GlobalButton from "../Components/Button";
+import { api } from '../Config';
 
 const MIN_COMMENT_LEN = 10;
 const MAX_IMAGES = 5;
@@ -12,31 +13,16 @@ const ALLOWED_IMAGE_TYPES = [
   "image/webp",
 ];
 
-const API_BASE_URL = "https://shop.adroitalarm.com.au/api";
-
 // helpers
-const toNumeric = (v) => {
-  if (v === null || v === undefined) return null;
-  if (!isNaN(Number(v))) return Number(v);
-  const m = String(v).match(/\d+/g);
-  return m ? Number(m.join("")) : null;
-};
-
 const clamp = (num, min, max) => Math.max(min, Math.min(max, num));
 
-const ReviewTab = ({ user, orders, fetchUserOrders, getItemImageUrl }) => {
+const ReviewTab = ({ user, getItemImageUrl }) => {
   const [reviewItems, setReviewItems] = useState([]);
   const [reviewsError, setReviewsError] = useState(null);
-  const [selectedOrderForReview, setSelectedOrderForReview] = useState("all");
   const [expandedReviewId, setExpandedReviewId] = useState(null);
   const [reviewFormData, setReviewFormData] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Get auth token from user or localStorage
-  const getAuthToken = () => {
-    return user?.token || localStorage.getItem("auth_token") || "";
-  };
 
   // -------- Real API Integration --------
   const fetchReviewables = async () => {
@@ -44,34 +30,16 @@ const ReviewTab = ({ user, orders, fetchUserOrders, getItemImageUrl }) => {
       setIsLoading(true);
       setReviewsError(null);
 
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error("Authentication token not found");
-      }
+      const response = await api.get("/user/products/to-review");
 
-      const response = await fetch(`${API_BASE_URL}/user/products/to-review`, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message || "Failed to fetch reviewable products");
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to fetch reviewable products");
       }
 
       // Transform API response to match our component structure
-      const transformedItems = data.products_to_review.map(
-        (product, index) => ({
-          id: `${product.order_id}-${product.product_id}-${index}`,
+      const transformedItems = response.data.products_to_review.map(
+        (product, _index) => ({
+          id: `${product.order_id}-${product.product_id}-${_index}`,
           order_id: product.order_id,
           product_id: product.product_id,
           order_code: product.order_id,
@@ -91,20 +59,31 @@ const ReviewTab = ({ user, orders, fetchUserOrders, getItemImageUrl }) => {
         })
       );
       setReviewItems(transformedItems);
-        // console.log(transformedItems)
+      console.log("Reviewable products:", transformedItems);
 
       return {
         items: transformedItems,
-        summary: data.summary,
+        summary: response.data.summary,
       };
     } catch (error) {
-      setReviewsError(`Failed to load reviewable products: ${error.message}`);
+      console.error("Error fetching reviewable products:", error);
+      
+      let errorMessage = "Failed to load reviewable products";
+      if (error.response?.status === 401) {
+        errorMessage = "Authentication failed. Please log in again.";
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else {
+        errorMessage = error.message;
+      }
+      
+      setReviewsError(errorMessage);
       setReviewItems([]);
 
       // Show error to user
       Swal.fire({
         title: "Error",
-        text: error.message,
+        text: errorMessage,
         icon: "error",
         confirmButtonText: "OK",
       });
@@ -250,125 +229,109 @@ const ReviewTab = ({ user, orders, fetchUserOrders, getItemImageUrl }) => {
     };
   };
 
-// ---------- Submit Review (Real API) ----------
-const handleSubmitReview = async (item) => {
-  const fd = reviewFormData[item.id];
-  if (!fd) {
-    Swal.fire("Error", "Review data not found. Please try again.", "error");
-    return;
-  }
-
-  const { errors, normalizedRating, productId, orderId, isValid } =
-    validateReviewData(fd);
-  if (!isValid) {
-    Swal.fire("Error", errors.join("\n"), "error");
-    return;
-  }
-
-  setIsSubmitting(true);
-  try {
-    const token = getAuthToken();
-    if (!token) {
-      throw new Error("Authentication token not found");
+  // ---------- Submit Review (Real API) ----------
+  const handleSubmitReview = async (item) => {
+    const fd = reviewFormData[item.id];
+    if (!fd) {
+      Swal.fire("Error", "Review data not found. Please try again.", "error");
+      return;
     }
 
-    // Create FormData for multipart upload
-    const formData = new FormData();
-    
-    // Required fields
-    formData.append("product_id", productId);        // string - product identifier
-    formData.append("order_id", orderId);            // string - order identifier
-    formData.append("rating", normalizedRating.toString()); // string - rating value (0.5 to 5)
-    formData.append("comment", fd.comment.trim());   // string - review text
+    const { errors, normalizedRating, productId, orderId, isValid } =
+      validateReviewData(fd);
+    if (!isValid) {
+      Swal.fire("Error", errors.join("\n"), "error");
+      return;
+    }
 
-    // Optional: images array
-    if (fd.images && fd.images.length > 0) {
-      fd.images.forEach((image, index) => {
-        formData.append("images[]", image);          // file objects - product images
+    setIsSubmitting(true);
+    try {
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      
+      // Required fields
+      formData.append("product_id", productId);        // string - product identifier
+      formData.append("order_id", orderId);            // string - order identifier
+      formData.append("rating", normalizedRating.toString()); // string - rating value (0.5 to 5)
+      formData.append("comment", fd.comment.trim());   // string - review text
+
+      // Optional: images array
+      if (fd.images && fd.images.length > 0) {
+        fd.images.forEach((image) => {
+          formData.append("images[]", image);          // file objects - product images
+        });
+      }
+
+      // Debug: Log what's being sent (remove in production)
+      console.log("Submitting review with data:", {
+        product_id: productId,
+        order_id: orderId,
+        rating: normalizedRating,
+        comment: fd.comment.trim(),
+        image_count: fd.images?.length || 0,
+        images: fd.images?.map(img => ({
+          name: img.name,
+          type: img.type,
+          size: img.size
+        }))
       });
+
+      // Log FormData entries (for debugging)
+      for (const [key, value] of formData.entries()) {
+        console.log(`FormData: ${key} =`, value);
+      }
+
+      // Use the centralized API for FormData submission
+      const response = await api.post("/reviews/submit", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to submit review");
+      }
+
+      Swal.fire({
+        title: "Success!",
+        text: response.data.message || "Review submitted successfully",
+        icon: "success",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+
+      // Remove the reviewed item from the list
+      setReviewItems((prev) => prev.filter((ri) => ri.id !== item.id));
+      setExpandedReviewId(null);
+
+      // Clean up form data
+      setReviewFormData((prev) => {
+        const nd = { ...prev };
+        delete nd[item.id];
+        return nd;
+      });
+    } catch (error) {
+      console.error("Error in review submission:", error);
+
+      let errorMessage = "Failed to submit review. Please try again.";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      Swal.fire({
+        title: "Submission Error",
+        text: errorMessage,
+        icon: "error",
+        confirmButtonText: "OK",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Debug: Log what's being sent (remove in production)
-    console.log("Submitting review with data:", {
-      product_id: productId,
-      order_id: orderId,
-      rating: normalizedRating,
-      comment: fd.comment.trim(),
-      image_count: fd.images?.length || 0,
-      images: fd.images?.map(img => ({
-        name: img.name,
-        type: img.type,
-        size: img.size
-      }))
-    });
-
-    // Log FormData entries (for debugging)
-    for (let [key, value] of formData.entries()) {
-      console.log(`FormData: ${key} =`, value);
-    }
-
-    const response = await fetch(`${API_BASE_URL}/reviews/submit`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-        // Don't set Content-Type for FormData - browser will set it with boundary automatically
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `HTTP error! status: ${response.status}, message: ${errorText}`
-      );
-    }
-
-    const result = await response.json();
-
-    if (!result.success) {
-      throw new Error(result.message || "Failed to submit review");
-    }
-
-    Swal.fire({
-      title: "Success!",
-      text: result.message || "Review submitted successfully",
-      icon: "success",
-      timer: 3000,
-      showConfirmButton: false,
-    });
-
-    // Remove the reviewed item from the list
-    setReviewItems((prev) => prev.filter((ri) => ri.id !== item.id));
-    setExpandedReviewId(null);
-
-    // Clean up form data
-    setReviewFormData((prev) => {
-      const nd = { ...prev };
-      delete nd[item.id];
-      return nd;
-    });
-  } catch (error) {
-    console.error("Error in review submission:", error);
-
-    Swal.fire({
-      title: "Submission Error",
-      text: error.message || "Failed to submit review. Please try again.",
-      icon: "error",
-      confirmButtonText: "OK",
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const productsToReview = Array.isArray(reviewItems) ? reviewItems : [];
-  const filteredReviewItems =
-    selectedOrderForReview === "all"
-      ? productsToReview
-      : productsToReview.filter(
-          (x) => String(x.order_id) === String(selectedOrderForReview)
-        );
 
   return (
     <div className="table-container">
@@ -425,7 +388,7 @@ const handleSubmitReview = async (item) => {
         </div>
       ) : (
         <div className="list-group rounded-0">
-          {filteredReviewItems.map((item, index) => {
+          {productsToReview.map((item) => {
             const imageUrl =
               item.image_url ||
               (getItemImageUrl ? getItemImageUrl(item) : null);

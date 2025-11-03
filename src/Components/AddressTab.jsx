@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import axios from "axios";
 import Swal from "sweetalert2";
+import { api } from '../Config';
 import AddressEditModal from "../Components/AddressEditModal";
 
 const AddressTab = ({ user, userAddresses: initialAddresses, onAddressesUpdate }) => {
@@ -8,7 +8,6 @@ const AddressTab = ({ user, userAddresses: initialAddresses, onAddressesUpdate }
   const [addressError, setAddressError] = useState(null);
   const [showEditAddressModal, setShowEditAddressModal] = useState(false);
   const [selectedAddressForEdit, setSelectedAddressForEdit] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
 
   // Update local state when prop changes
   React.useEffect(() => {
@@ -18,14 +17,7 @@ const AddressTab = ({ user, userAddresses: initialAddresses, onAddressesUpdate }
   // -------- Address Data Fetching --------
   const fetchUserAddresses = async () => {
     try {
-      const token = localStorage.getItem("auth_token");
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}api/address`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      );
+      const response = await api.get("/address");
 
       if (response.data.status === 200) {
         const addresses = response.data.data;
@@ -43,17 +35,10 @@ const AddressTab = ({ user, userAddresses: initialAddresses, onAddressesUpdate }
   };
 
   // -------- Address Deletion --------
+  // -------- Address Deletion --------
   const handleDeleteAddress = async (addressId) => {
     try {
-      setDeletingId(addressId);
-      const token = localStorage.getItem("auth_token");
-      const response = await axios.delete(
-        `${import.meta.env.VITE_API_URL}api/address/${addressId}/delete`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      );
+      const response = await api.delete(`/address/${addressId}/delete`);
 
       if (response.data.status === 200) {
         Swal.fire({
@@ -74,11 +59,8 @@ const AddressTab = ({ user, userAddresses: initialAddresses, onAddressesUpdate }
         icon: "error",
         confirmButtonColor: "#0d6efd",
       });
-    } finally {
-      setDeletingId(null);
     }
   };
-
   const confirmDeleteAddress = (addressId) => {
     Swal.fire({
       title: "Are you sure?",
@@ -164,14 +146,13 @@ const AddressTab = ({ user, userAddresses: initialAddresses, onAddressesUpdate }
                     )}
                   </div>
                   <div className="d-flex justify-content-end">
-                    {/* <button
+                    <button
                       className="btn btn-link text-danger p-0 border-0 small text-decoration-none me-3"
                       onClick={() => confirmDeleteAddress(address.id)}
-                      disabled={deletingId === address.id}
-                      style={{ cursor: deletingId === address.id ? 'not-allowed' : 'pointer' }}
+                      style={{ cursor: 'pointer' }}
                     >
-                      {deletingId === address.id ? "Deleting..." : "Delete"}
-                    </button> */}
+                      Delete
+                    </button>
                     <button
                       className="btn btn-link text-dark p-0 border-0 small text-decoration-none me-3"
                       onClick={(e) => handleCopyAddress(address, e)}

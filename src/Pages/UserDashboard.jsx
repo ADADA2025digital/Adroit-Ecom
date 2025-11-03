@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import PageHeader from "../Components/PageHeader";
-import axios from "axios";
+import { api } from '../Config';
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import GlobalButton from "../Components/Button";
@@ -14,6 +14,8 @@ import ReviewTab from "../Components/ReviewTab";
 import UserTab from "../Components/UserTab";
 import RenderOrderCard from "../Components/RenderOrderCard";
 import OrderDetailsModal from "../Components/OrderDetailsModal";
+import NotificationTab from "../Components/NotificationTab";
+import ApprovedReviewsTab from "../Components/ApprovedReviewsTab.jsx";
 
 const Dashboard = ({ handleLogout }) => {
   // Get initial tab from localStorage or default to "dashboard"
@@ -30,11 +32,14 @@ const Dashboard = ({ handleLogout }) => {
   const [unpaidOrders, setUnpaidOrders] = useState([]);
   const [cancellations, setCancellations] = useState([]);
   const [walletData, setWalletData] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const [error, setError] = useState(null);
   const [cancellationError, setCancellationError] = useState(null);
   const [walletError, setWalletError] = useState(null);
   const [addressError, setAddressError] = useState(null);
+  const [notificationError, setNotificationError] = useState(null);
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -58,10 +63,174 @@ const Dashboard = ({ handleLogout }) => {
   const [loadingInvoice, setLoadingInvoice] = useState(false);
   const [invoiceError, setInvoiceError] = useState(null);
 
+  // Live update states
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const eventSourceRef = useRef(null);
+  const pollingIntervalsRef = useRef({});
+
   // Update localStorage whenever activeTab changes
   useEffect(() => {
     localStorage.setItem("dashboardActiveTab", activeTab);
   }, [activeTab]);
+
+  // -------- Real-time Updates Setup --------
+  const setupRealTimeUpdates = () => {
+    // Try Server-Sent Events first
+    setupSSE();
+    
+    // Setup polling as fallback
+    setupPolling();
+  };
+
+  const setupSSE = () => {
+    try {
+      const eventSource = new EventSource(`/api/events`);
+
+      eventSource.onopen = () => {
+        console.log("SSE Connected");
+        setIsConnected(true);
+      };
+
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleRealTimeUpdate(data);
+        setLastUpdate(new Date());
+      };
+
+      eventSource.onerror = (error) => {
+        console.error("SSE Error:", error);
+        setIsConnected(false);
+        eventSource.close();
+        // Fall back to polling
+        setupPolling();
+      };
+
+      eventSourceRef.current = eventSource;
+
+      return () => {
+        eventSource.close();
+      };
+    } catch (error) {
+      console.error("SSE setup failed:", error);
+      setupPolling();
+    }
+  };
+
+  const setupPolling = () => {
+    // Clear existing intervals
+    Object.values(pollingIntervalsRef.current).forEach(clearInterval);
+    
+    // Poll orders every 30 seconds
+    pollingIntervalsRef.current.orders = setInterval(() => {
+      fetchUserOrders();
+    }, 30000);
+
+    // Poll notifications every 20 seconds
+    pollingIntervalsRef.current.notifications = setInterval(() => {
+      fetchNotifications();
+      fetchUnreadCount();
+    }, 20000);
+
+    // Poll cancellations every 45 seconds
+    pollingIntervalsRef.current.cancellations = setInterval(() => {
+      fetchCancellations();
+      fetchWalletData();
+    }, 45000);
+
+    console.log("Polling setup completed");
+  };
+
+  const handleRealTimeUpdate = (data) => {
+    switch (data.type) {
+      case 'order_updated':
+        updateOrderInState(data.order);
+        break;
+      case 'order_created':
+        addOrderToState(data.order);
+        break;
+      case 'notification_created':
+        addNotificationToState(data.notification);
+        break;
+      case 'notification_updated':
+        updateNotificationInState(data.notification);
+        break;
+      case 'cancellation_updated':
+        updateCancellationInState(data.cancellation);
+        break;
+      case 'wallet_updated':
+        updateWalletData(data.wallet);
+        break;
+      default:
+        console.log('Unknown event type:', data.type);
+    }
+  };
+
+  // State update helpers for real-time
+  const updateOrderInState = (updatedOrder) => {
+    setOrders(prev => prev.map(order => 
+      order.id === updatedOrder.order_id ? formatOrder(updatedOrder) : order
+    ));
+    setUnpaidOrders(prev => prev.filter(order => 
+      order.status === "paid" || order.status === "Completed"
+    ));
+  };
+
+  const addOrderToState = (newOrder) => {
+    const formattedOrder = formatOrder(newOrder);
+    setOrders(prev => [formattedOrder, ...prev]);
+    if (formattedOrder.status !== "paid" && formattedOrder.status !== "Completed") {
+      setUnpaidOrders(prev => [formattedOrder, ...prev]);
+    }
+  };
+
+  const addNotificationToState = (newNotification) => {
+    setNotifications(prev => [newNotification, ...prev]);
+    if (newNotification.status === 'unread') {
+      setUnreadCount(prev => prev + 1);
+    }
+  };
+
+  const updateNotificationInState = (updatedNotification) => {
+    setNotifications(prev => prev.map(notification =>
+      notification.notification_id === updatedNotification.notification_id 
+        ? updatedNotification 
+        : notification
+    ));
+    
+    // Update unread count
+    const unread = notifications.filter(n => n.status === 'unread').length;
+    setUnreadCount(unread);
+  };
+
+  const updateCancellationInState = (updatedCancellation) => {
+    setCancellations(prev => prev.map(cancellation =>
+      cancellation.cancellation_id === updatedCancellation.cancellation_id
+        ? updatedCancellation
+        : cancellation
+    ));
+  };
+
+  const updateWalletData = (newWalletData) => {
+    setWalletData(prev => [newWalletData, ...prev]);
+  };
+
+  // Format order helper
+  const formatOrder = (order) => {
+    let amount = parseFloat(order.total_price) || 0;
+    if (isNaN(amount)) amount = 0;
+
+    return {
+      id: order.order_id,
+      date: order.created_at
+        ? new Date(order.created_at).toLocaleDateString()
+        : new Date().toLocaleDateString(),
+      amount,
+      status: order.payment_status,
+      method: order.payment_method,
+      fullData: order,
+    };
+  };
 
   // -------- Helper to safely get an item's image URL --------
   const getItemImageUrl = (item) => {
@@ -83,7 +252,13 @@ const Dashboard = ({ handleLogout }) => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     try {
-      return new Date(dateString).toLocaleDateString();
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     } catch (error) {
       return "Invalid Date";
     }
@@ -96,13 +271,7 @@ const Dashboard = ({ handleLogout }) => {
         const token = localStorage.getItem("auth_token");
         if (!token) return performLogout();
 
-        const response = await axios.get(
-          `${import.meta.env.VITE_API_URL}api/auth/user`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            withCredentials: true,
-          }
-        );
+        const response = await api.get("/auth/user");
         setUser(response.data);
       } catch (err) {
         performLogout();
@@ -114,14 +283,7 @@ const Dashboard = ({ handleLogout }) => {
   // -------- Address Data Fetching --------
   const fetchUserAddresses = async () => {
     try {
-      const token = localStorage.getItem("auth_token");
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}api/address`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      );
+      const response = await api.get("/address");
 
       if (response.data.status === 200) {
         setUserAddresses(response.data.data);
@@ -133,45 +295,162 @@ const Dashboard = ({ handleLogout }) => {
     }
   };
 
+  // -------- Notification Data Fetching --------
+  const fetchNotifications = async () => {
+    try {
+      const response = await api.get("/notifications");
+
+      if (response.data.success) {
+        setNotifications(response.data.data || []);
+        setNotificationError(null);
+      } else {
+        throw new Error(response.data.message || "Failed to fetch notifications");
+      }
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+      setNotificationError(err.response?.data?.message || err.message);
+    }
+  };
+
+  // -------- Unread Count Fetching --------
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await api.get("/notifications/unread-count");
+
+      if (response.data.success) {
+        setUnreadCount(response.data.unread_count || 0);
+      }
+    } catch (err) {
+      console.error("Error fetching unread count:", err);
+      // Calculate from local notifications as fallback
+      const unread = notifications.filter(n => n.status === 'unread').length;
+      setUnreadCount(unread);
+    }
+  };
+
+  // -------- Mark Notification as Read --------
+  const markNotificationAsRead = async (notificationId) => {
+    try {
+      const response = await api.put(`/notifications/${notificationId}/read`, {});
+
+      if (response.data.success) {
+        // Update local state immediately for better UX
+        setNotifications(prev =>
+          prev.map(notification =>
+            notification.notification_id === notificationId
+              ? { ...notification, status: "read", read_at: new Date().toISOString() }
+              : notification
+          )
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      } else {
+        console.error("Failed to mark as read:", response.data.message);
+      }
+    } catch (err) {
+      console.error("Error marking notification as read:", err);
+    }
+  };
+
+  // -------- Mark All Notifications as Read --------
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const response = await api.put("/notifications/read-all", {});
+
+      if (response.data.success) {
+        // Update all notifications to read immediately
+        setNotifications(prev =>
+          prev.map(notification => ({
+            ...notification,
+            status: "read",
+            read_at: notification.read_at || new Date().toISOString(),
+          }))
+        );
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error("Error marking all as read:", err);
+    }
+  };
+
+  // -------- Delete Notification --------
+  const deleteNotification = async (notificationId) => {
+    try {
+      const response = await api.delete(`/notifications/${notificationId}`);
+
+      if (response.data.success) {
+        // Remove from local state immediately
+        setNotifications(prev =>
+          prev.filter(notification => notification.notification_id !== notificationId)
+        );
+        // Recalculate unread count
+        const unread = notifications.filter(n => n.status === 'unread').length;
+        setUnreadCount(unread);
+      } else {
+        console.error("Failed to delete notification:", response.data.message);
+      }
+    } catch (err) {
+      console.error("Error deleting notification:", err);
+    }
+  };
+
+  // -------- Clear All Notifications --------
+  const clearAllNotifications = async () => {
+    try {
+      const response = await api.delete("/notifications");
+
+      if (response.data.success) {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error("Error clearing all notifications:", err);
+    }
+  };
+
+  // Handle notifications update from child component
+  const handleNotificationsUpdate = (updatedNotifications) => {
+    setNotifications(updatedNotifications);
+    const unread = updatedNotifications.filter(n => n.status === 'unread').length;
+    setUnreadCount(unread);
+  };
+
+  // Initial data fetch and real-time setup
   useEffect(() => {
     if (!user) return;
-    (async () => {
-      const freshOrders = await fetchUserOrders();
-      fetchCancellations();
-      fetchWalletData();
-      fetchUserAddresses();
-    })();
+
+    const fetchAllData = async () => {
+      await fetchUserOrders();
+      await fetchCancellations();
+      await fetchWalletData();
+      await fetchUserAddresses();
+      await fetchNotifications();
+      await fetchUnreadCount();
+      
+      // Setup real-time updates after initial data load
+      setupRealTimeUpdates();
+    };
+
+    fetchAllData();
+
+    // Cleanup function
+    return () => {
+      // Close SSE connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+      
+      // Clear all polling intervals
+      Object.values(pollingIntervalsRef.current).forEach(clearInterval);
+    };
   }, [user]);
 
   // -------- Order Data Fetching --------
   const fetchUserOrders = async () => {
     try {
-      const token = localStorage.getItem("auth_token");
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}api/user/orders`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      );
+      const response = await api.get("/user/orders");
 
       if (response.data.status === 200) {
-        const formattedOrders = response.data.data.map((order) => {
-          let amount = parseFloat(order.total_price) || 0;
-          if (isNaN(amount)) amount = 0;
-
-          return {
-            id: order.order_id,
-            date: order.created_at
-              ? new Date(order.created_at).toLocaleDateString()
-              : new Date().toLocaleDateString(),
-            amount,
-            status: order.payment_status,
-            method: order.payment_method,
-            fullData: order,
-          };
-        });
-
+        const formattedOrders = response.data.data.map(formatOrder);
         setOrders(formattedOrders);
 
         const unpaid = formattedOrders.filter(
@@ -192,15 +471,7 @@ const Dashboard = ({ handleLogout }) => {
   // -------- Order Cancellation Data Fetching --------
   const fetchCancellations = async () => {
     try {
-      const token = localStorage.getItem("auth_token");
-
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}api/orders/cancellations`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      );
+      const response = await api.get("/orders/cancellations");
 
       if (response.data.success) {
         setCancellations(response.data.data);
@@ -213,16 +484,7 @@ const Dashboard = ({ handleLogout }) => {
   // -------- Refund Data Fetching --------
   const fetchWalletData = async () => {
     try {
-      const token = localStorage.getItem("auth_token");
-      const response = await axios.get(
-        `${
-          import.meta.env.VITE_API_URL
-        }api/orders/cancellations?status=refunded`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      );
+      const response = await api.get("/orders/cancellations?status=refunded");
 
       if (response.data.success) {
         const walletTransactions = response.data.data.map((cancellation) => ({
@@ -262,17 +524,17 @@ const Dashboard = ({ handleLogout }) => {
     try {
       const token = localStorage.getItem("auth_token");
       if (token) {
-        await axios.post(
-          `${import.meta.env.VITE_API_URL}api/auth/logout`,
-          {},
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            withCredentials: true,
-          }
-        );
+        await api.post("/auth/logout", {});
       }
     } catch (err) {
+      // Logout should proceed even if API call fails
     } finally {
+      // Cleanup real-time connections
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+      Object.values(pollingIntervalsRef.current).forEach(clearInterval);
+      
       localStorage.clear();
       sessionStorage.clear();
       clearAllCookies();
@@ -313,13 +575,7 @@ const Dashboard = ({ handleLogout }) => {
         return;
       }
 
-      const url = `${
-        import.meta.env.VITE_API_URL
-      }api/orders/${orderId}/summary`;
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
-      });
+      const { data } = await api.get(`/orders/${orderId}/summary`);
 
       if (!data?.success || !data?.order_summary) {
         throw new Error("Unable to load order summary");
@@ -424,26 +680,15 @@ const Dashboard = ({ handleLogout }) => {
     }
 
     try {
-      const token = localStorage.getItem("auth_token");
       const finalReason =
         selectedReason === "Other" && customReason
           ? customReason
           : selectedReason;
 
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}api/orders/cancel/request`,
-        {
-          order_id: selectedOrder.id,
-          reason: finalReason,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          withCredentials: true,
-        }
-      );
+      const response = await api.post("/orders/cancel/request", {
+        order_id: selectedOrder.id,
+        reason: finalReason,
+      });
 
       if (response.data.success) {
         Swal.fire({
@@ -454,8 +699,7 @@ const Dashboard = ({ handleLogout }) => {
         });
 
         setShowOrderModal(false);
-        fetchUserOrders();
-        fetchCancellations();
+        // Real-time updates will handle the refresh automatically
       } else {
         throw new Error(response.data.message || "Failed to cancel order");
       }
@@ -534,14 +778,7 @@ const Dashboard = ({ handleLogout }) => {
       setLoadingInvoice(true);
       setInvoiceError(null);
 
-      const token = localStorage.getItem("auth_token");
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}api/invoice/${orderId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      );
+      const response = await api.get(`/invoice/${orderId}`);
 
       if (response.data.success) {
         setInvoiceData(response.data.data);
@@ -559,6 +796,28 @@ const Dashboard = ({ handleLogout }) => {
       });
     } finally {
       setLoadingInvoice(false);
+    }
+  };
+
+  // Manual refresh function
+  const refreshAllData = async () => {
+    try {
+      await fetchUserOrders();
+      await fetchCancellations();
+      await fetchWalletData();
+      await fetchNotifications();
+      await fetchUnreadCount();
+      setLastUpdate(new Date());
+      
+      Swal.fire({
+        title: "Refreshed!",
+        text: "All data has been updated.",
+        icon: "success",
+        confirmButtonColor: "#0d6efd",
+        timer: 1500
+      });
+    } catch (error) {
+      console.error("Error refreshing data:", error);
     }
   };
 
@@ -580,7 +839,16 @@ const Dashboard = ({ handleLogout }) => {
       case "wallet":
         return (
           <div className="table-container">
-            <h4 className="fw-bold heading py-3">My Wallet</h4>
+            <div className="d-flex justify-content-between align-items-center py-3">
+              <h4 className="fw-bold heading m-0">My Wallet</h4>
+              <button 
+                className="btn btn-outline-primary btn-sm rounded-0"
+                onClick={refreshAllData}
+              >
+                <i className="bi bi-arrow-clockwise me-1"></i>
+                Refresh
+              </button>
+            </div>
             {walletError ? (
               <div className="alert alert-danger">{walletError}</div>
             ) : walletData.length === 0 ? (
@@ -664,7 +932,16 @@ const Dashboard = ({ handleLogout }) => {
       case "orders":
         return (
           <div className="table-container">
-            <h4 className="fw-bold heading py-3">My Orders</h4>
+            <div className="d-flex justify-content-between align-items-center py-3">
+              <h4 className="fw-bold heading m-0">My Orders</h4>
+              <button 
+                className="btn btn-outline-primary btn-sm rounded-0"
+                onClick={refreshAllData}
+              >
+                <i className="bi bi-arrow-clockwise me-1"></i>
+                Refresh
+              </button>
+            </div>
             {error ? (
               <div className="alert alert-danger">{error}</div>
             ) : orders.length === 0 ? (
@@ -693,7 +970,16 @@ const Dashboard = ({ handleLogout }) => {
       case "unpaidOrders":
         return (
           <div className="table-container">
-            <h4 className="fw-bold heading py-3">Unpaid Orders</h4>
+            <div className="d-flex justify-content-between align-items-center py-3">
+              <h4 className="fw-bold heading m-0">Unpaid Orders</h4>
+              <button 
+                className="btn btn-outline-primary btn-sm rounded-0"
+                onClick={refreshAllData}
+              >
+                <i className="bi bi-arrow-clockwise me-1"></i>
+                Refresh
+              </button>
+            </div>
             {error ? (
               <div className="alert alert-danger">{error}</div>
             ) : unpaidOrders.length === 0 ? (
@@ -727,6 +1013,7 @@ const Dashboard = ({ handleLogout }) => {
             formatDate={formatDate}
             getStatusBadgeClass={getStatusBadgeClass}
             getItemImageUrl={getItemImageUrl}
+            onRefresh={refreshAllData}
           />
         );
 
@@ -737,6 +1024,35 @@ const Dashboard = ({ handleLogout }) => {
             orders={orders}
             fetchUserOrders={fetchUserOrders}
             getItemImageUrl={getItemImageUrl}
+          />
+        );
+
+      case "approvedReviews":
+        return (
+          <ApprovedReviewsTab
+            user={user}
+            formatDate={formatDate}
+            onRefresh={refreshAllData}
+          />
+        );
+
+      case "notifications":
+        return (
+          <NotificationTab
+            notifications={notifications}
+            formatDate={formatDate}
+            onMarkAsRead={markNotificationAsRead}
+            onMarkAllAsRead={markAllNotificationsAsRead}
+            onDeleteNotification={deleteNotification}
+            onClearAllNotifications={clearAllNotifications}
+            onNotificationsUpdate={handleNotificationsUpdate}
+            error={notificationError}
+            onRefresh={refreshAllData}
+            user={user}
+            getItemImageUrl={getItemImageUrl}
+            fetchUserOrders={fetchUserOrders}
+            fetchCancellations={fetchCancellations}
+            orders={orders}
           />
         );
 
@@ -753,7 +1069,33 @@ const Dashboard = ({ handleLogout }) => {
   return (
     <>
       <PageHeader title="Shop" path="Home / Dashboard" />
-      <div className="container py-5">
+      
+      {/* Connection Status Indicator */}
+      <div className="container-fluid bg-light py-2 border-bottom">
+        <div className="container">
+          <div className="row align-items-center">
+            {/* <div className="col-md-6">
+              <small className="text-muted">
+                <i className={`bi bi-circle-fill me-1 ${isConnected ? 'text-success' : 'text-warning'}`}></i>
+                {isConnected ? 'Live updates connected' : 'Using polling updates'}
+                <span className="ms-2">Last update: {formatDate(lastUpdate)}</span>
+              </small>
+            </div> */}
+            {/* <div className="col-md-6 text-end">
+              <button 
+                className="btn btn-outline-secondary btn-sm rounded-0"
+                onClick={refreshAllData}
+                title="Refresh all data"
+              >
+                <i className="bi bi-arrow-clockwise me-1"></i>
+                Refresh Now
+              </button>
+            </div> */}
+          </div>
+        </div>
+      </div>
+
+      <div className="container py-4">
         <div className="row">
           <div className="col-md-3 p-0">
             <div className="d-flex align-items-center p-3 gap-3">
@@ -820,6 +1162,23 @@ const Dashboard = ({ handleLogout }) => {
                 Dashboard
               </li>
               <li
+                className={`list-group-item border-0 p-2 ${
+                  activeTab === "notifications"
+                    ? "active text-primary ps-1 active-tab"
+                    : ""
+                }`}
+                onClick={() => handleTabChange("notifications")}
+                style={{ cursor: "pointer" }}
+              >
+                <i className="bi bi-bell p-2 me-2 fs-4 text-primary"></i>
+                Notifications
+                {unreadCount > 0 && (
+                  <span className="badge bg-danger ms-2 rounded-pill">
+                    {unreadCount}
+                  </span>
+                )}
+              </li>
+              <li
                 className={`list-group-item border-0 p-2${
                   activeTab === "orders"
                     ? "active text-primary active-tab ps-1"
@@ -871,6 +1230,18 @@ const Dashboard = ({ handleLogout }) => {
               </li>
 
               <li
+                className={`list-group-item border-0 p-2 ${
+                  activeTab === "approvedReviews"
+                    ? "active text-primary ps-1 active-tab"
+                    : ""
+                }`}
+                onClick={() => handleTabChange("approvedReviews")}
+                style={{ cursor: "pointer" }}
+              >
+                <i className="bi bi-star p-2 me-2 fs-4 text-primary"></i>
+                My Reviews
+              </li>
+              <li
                 className={`list-group-item border-0 p-2${
                   activeTab === "reviews"
                     ? "active text-primary active-tab ps-1"
@@ -880,8 +1251,9 @@ const Dashboard = ({ handleLogout }) => {
                 style={{ cursor: "pointer" }}
               >
                 <i className="bi bi-chat-left-text p-2 me-2 fs-4 text-primary"></i>
-                My Reviews
+                To Be Reviews
               </li>
+              
 
               <li
                 className={`list-group-item border-0 p-2 ${
@@ -947,6 +1319,27 @@ const Dashboard = ({ handleLogout }) => {
                 >
                   <i className="bi bi-chat-left-text fs-3 text-primary"></i>
                   <p className="m-0 small">My Reviews</p>
+                </div>
+                <div
+                  className="border py-3"
+                  onClick={() => handleTabChange("approvedReviews")}
+                  style={{ cursor: "pointer" }}
+                >
+                  <i className="bi bi-star-fill fs-3 text-primary"></i>
+                  <p className="m-0 small">Approved</p>
+                </div>
+                <div
+                  className="border py-3 position-relative"
+                  onClick={() => handleTabChange("notifications")}
+                  style={{ cursor: "pointer" }}
+                >
+                  <i className="bi bi-bell fs-3 text-primary"></i>
+                  <p className="m-0 small">Notifications</p>
+                  {unreadCount > 0 && (
+                    <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                      {unreadCount}
+                    </span>
+                  )}
                 </div>
                 <div
                   className="border py-3"
