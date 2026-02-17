@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Helmet } from "react-helmet-async";
 import PageHeader from "../Components/PageHeader";
 import { faqData } from "../Constants/Data";
 
@@ -12,6 +13,60 @@ const FAQ = () => {
 
   return (
     <>
+      <Helmet>
+        {/* Basic SEO */}
+        <title>Frequently Asked Questions | Adroit Alarm Systems</title>
+        <meta
+          name="description"
+          content="ADROIT is a premier Australian security company specializing in Electronic Security, Home Automation, Audio Visual, Data Cabling, and Ducted Vacuum systems. ASIAL accredited with 20+ years of experience delivering integrated, hassle-free solutions."
+        />
+        <meta
+          name="keywords"
+          content="ADROIT, Adroit Alarm System, security companies Australia, electronic security Sydney, home automation Australia, audio visual installation, data cabling contractors, ducted vacuum systems, ASIAL Silver Member, security license holders, integrated security solutions, Dynalite certified, commercial security, residential automation, access control, CCTV installation Australia"
+        />
+        <meta name="author" content="ADROIT Alarm Systems Australia" />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://shop.adroitalarm.com.au/" />
+
+        {/* Open Graph */}
+        <meta
+          property="og:title"
+          content="ADROIT Alarm Systems | Electronic Security & Automation Experts"
+        />
+        <meta
+          property="og:description"
+          content="Since 2008, ADROIT has delivered premium integrated solutions including security, automation, and AV. Fully licensed (Master License No: 000101930) and ASIAL accredited."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://shop.adroitalarm.com.au/" />
+        <meta property="og:site_name" content="ADROIT Alarm Systems" />
+
+        {/* Social Links */}
+        <meta
+          property="og:see_also"
+          content="https://www.instagram.com/adroitalarm/"
+        />
+        <meta
+          property="og:see_also"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Facebook  */}
+        <meta property="fb:app_id" content="#" />
+        <meta
+          property="fb:admins"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Instagram */}
+        <meta name="instagram:title" content="ADROIT Alarm Systems Australia" />
+        <meta
+          name="instagram:description"
+          content="Integrated solutions in electronic security, automation, audio visual and data cabling. Trusted Australian security specialists since 2008."
+        />
+        <meta name="instagram:site" content="@adroitalarm" />
+      </Helmet>
+
       <PageHeader title="Frequently Asked Questions" path="Home / FAQ" />
 
       <div className="container my-5">
@@ -23,9 +78,9 @@ const FAQ = () => {
                   {/* Toggle Button */}
                   <div
                     onClick={() => toggleFaq(index)}
-                    className={`w-100 selected border d-flex justify-content-between align-items-center px-4 py-3 ${
+                    className={`w-100 selected border bg-white d-flex justify-content-between align-items-center px-4 py-3 ${
                       openFaqId === index
-                        ? "text-white bg-primary border-0 heading shadow-sm"
+                        ? "text-primary fwbold heading shadow-sm"
                         : " bg-white"
                     }`}
                     aria-expanded={openFaqId === index}

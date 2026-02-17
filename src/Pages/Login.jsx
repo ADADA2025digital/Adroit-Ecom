@@ -35,14 +35,14 @@ const Login = ({ setIsLoggedIn }) => {
 
     try {
       // Direct login call without CSRF - just like Postman
-      console.log("Sending login request:", { email: loginInput.email, password: loginInput.password });
+      // console.log("Sending login request:", { email: loginInput.email, password: loginInput.password });
       
       const res = await api.post(`/login`, {
         email: loginInput.email,
         password: loginInput.password,
       });
 
-      console.log("Login response:", res.data);
+      // console.log("Login response:", res.data);
 
       if (res.data.token) {
         // Store auth data based on your Postman response
@@ -51,7 +51,7 @@ const Login = ({ setIsLoggedIn }) => {
         localStorage.setItem("role", res.data.data.role_id);
         
         setIsLoggedIn(true);
-        console.log("Login successful, navigating to:", from);
+        // console.log("Login successful, navigating to:", from);
         navigate(from, { replace: true });
       }
     } catch (error) {
@@ -76,11 +76,11 @@ const Login = ({ setIsLoggedIn }) => {
     <>
       <PageHeader title="Login" path="Home / Login" />
       <div className="container py-5">
-        <div className="row py-5">
-          <div className="col-md-6">
-            <h2 className="mb-4 text-uppercase heading">LOGIN</h2>
-            <div className="p-4 border bg-light shadow-sm">
-              
+        <div className="row py-5 align-items-stretch">
+          {/* Login Column */}
+          <div className="col-md-6 mb-4 mb-md-0">
+            <h2 className="mb-4 text-uppercase heading">LOGIN</h2> {/* Heading outside box */}
+            <div className="p-4 border bg-light shadow-sm h-100 d-flex flex-column">
               {/* Error Message */}
               {error && (
                 <div className="alert alert-danger" role="alert">
@@ -88,7 +88,7 @@ const Login = ({ setIsLoggedIn }) => {
                 </div>
               )}
 
-              <form onSubmit={loginSubmit}>
+              <form onSubmit={loginSubmit} className="flex-grow-1 d-flex flex-column">
                 <div className="mb-3">
                   <label htmlFor="email" className="form-label">
                     Email
@@ -105,7 +105,7 @@ const Login = ({ setIsLoggedIn }) => {
                   />
                 </div>
                 
-                <div className="mb-3 position-relative">
+                <div className="position-relative">
                   <label htmlFor="password" className="form-label">
                     Password
                   </label>
@@ -136,7 +136,7 @@ const Login = ({ setIsLoggedIn }) => {
                   </div>
                 </div>
                 
-                <div className="d-flex flex-column flex-md-row justify-content-between align-items-end">
+                <div className="d-flex flex-column flex-md-row justify-content-between align-items-end mt-auto">
                   <GlobalButton
                     children={isSubmitting ? "Logging in..." : "Login"}
                     disabled={isSubmitting}
@@ -155,13 +155,16 @@ const Login = ({ setIsLoggedIn }) => {
             </div>
           </div>
 
-          <div className="col-md-6 mt-4 mt-md-0">
-            <h2 className="mb-4 heading">NEW CUSTOMER</h2>
-            <div className="p-4 border bg-light shadow-sm">
-              <h3 className="h5 mb-3 heading">Create an account</h3>
-              <p className="text-muted">Register quickly and start shopping.</p>
-              <div className="d-flex">
-                <GlobalButton children="Create An Account" to="/register" />
+          {/* New Customer Column */}
+          <div className="col-md-6">
+            <h2 className="mb-4 heading">NEW CUSTOMER</h2> {/* Heading outside box */}
+            <div className="p-4 border bg-light shadow-sm h-100 d-flex flex-column">
+              <div className="d-flex flex-column">
+                <h3 className="h5 mb-3 heading">Create an account</h3>
+                <p className="text-muted">Sign up for a free account at our store. Registration is quick and easy. It allows you to be able to order from our shop. To start shopping click register.</p>
+                <div className="d-flex mt-auto">
+                  <GlobalButton children="Create An Account" to="/register" />
+                </div>
               </div>
             </div>
           </div>

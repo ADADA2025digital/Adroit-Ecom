@@ -31,12 +31,10 @@ const UserTab = ({ user }) => {
         const response = await api.get("/user/reviews");
 
         if (response.data.success) {
-          // Reviews are fetched but not used in current UI
-          // Keeping the API call for potential future use
-          console.log("User reviews loaded:", response.data);
+          // console.log("User reviews loaded:", response.data);
         }
       } catch (err) {
-        console.error("Error fetching reviews:", err);
+        // console.error("Error fetching reviews:", err);
       }
     };
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Helmet } from "react-helmet-async";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import PageHeader from "../Components/PageHeader";
-import api from '../Config/api';
+import api from "../Config/api";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import GlobalButton from "../Components/Button";
@@ -24,7 +25,7 @@ const Dashboard = ({ handleLogout }) => {
   });
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  
+
   // Add userAddresses state
   const [userAddresses, setUserAddresses] = useState([]);
 
@@ -78,7 +79,7 @@ const Dashboard = ({ handleLogout }) => {
   const setupRealTimeUpdates = () => {
     // Try Server-Sent Events first
     setupSSE();
-    
+
     // Setup polling as fallback
     setupPolling();
   };
@@ -88,7 +89,6 @@ const Dashboard = ({ handleLogout }) => {
       const eventSource = new EventSource(`/api/events`);
 
       eventSource.onopen = () => {
-        console.log("SSE Connected");
         setIsConnected(true);
       };
 
@@ -99,7 +99,7 @@ const Dashboard = ({ handleLogout }) => {
       };
 
       eventSource.onerror = (error) => {
-        console.error("SSE Error:", error);
+        // console.error("SSE Error:", error);
         setIsConnected(false);
         eventSource.close();
         // Fall back to polling
@@ -112,7 +112,7 @@ const Dashboard = ({ handleLogout }) => {
         eventSource.close();
       };
     } catch (error) {
-      console.error("SSE setup failed:", error);
+      // console.error("SSE setup failed:", error);
       setupPolling();
     }
   };
@@ -120,7 +120,7 @@ const Dashboard = ({ handleLogout }) => {
   const setupPolling = () => {
     // Clear existing intervals
     Object.values(pollingIntervalsRef.current).forEach(clearInterval);
-    
+
     // Poll orders every 30 seconds
     pollingIntervalsRef.current.orders = setInterval(() => {
       fetchUserOrders();
@@ -138,81 +138,91 @@ const Dashboard = ({ handleLogout }) => {
       fetchWalletData();
     }, 45000);
 
-    console.log("Polling setup completed");
   };
 
   const handleRealTimeUpdate = (data) => {
     switch (data.type) {
-      case 'order_updated':
+      case "order_updated":
         updateOrderInState(data.order);
         break;
-      case 'order_created':
+      case "order_created":
         addOrderToState(data.order);
         break;
-      case 'notification_created':
+      case "notification_created":
         addNotificationToState(data.notification);
         break;
-      case 'notification_updated':
+      case "notification_updated":
         updateNotificationInState(data.notification);
         break;
-      case 'cancellation_updated':
+      case "cancellation_updated":
         updateCancellationInState(data.cancellation);
         break;
-      case 'wallet_updated':
+      case "wallet_updated":
         updateWalletData(data.wallet);
         break;
       default:
-        console.log('Unknown event type:', data.type);
+        // console.log("Unknown event type:", data.type);
     }
   };
 
   // State update helpers for real-time
   const updateOrderInState = (updatedOrder) => {
-    setOrders(prev => prev.map(order => 
-      order.id === updatedOrder.order_id ? formatOrder(updatedOrder) : order
-    ));
-    setUnpaidOrders(prev => prev.filter(order => 
-      order.status === "paid" || order.status === "Completed"
-    ));
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === updatedOrder.order_id ? formatOrder(updatedOrder) : order,
+      ),
+    );
+    setUnpaidOrders((prev) =>
+      prev.filter(
+        (order) => order.status === "paid" || order.status === "Completed",
+      ),
+    );
   };
 
   const addOrderToState = (newOrder) => {
     const formattedOrder = formatOrder(newOrder);
-    setOrders(prev => [formattedOrder, ...prev]);
-    if (formattedOrder.status !== "paid" && formattedOrder.status !== "Completed") {
-      setUnpaidOrders(prev => [formattedOrder, ...prev]);
+    setOrders((prev) => [formattedOrder, ...prev]);
+    if (
+      formattedOrder.status !== "paid" &&
+      formattedOrder.status !== "Completed"
+    ) {
+      setUnpaidOrders((prev) => [formattedOrder, ...prev]);
     }
   };
 
   const addNotificationToState = (newNotification) => {
-    setNotifications(prev => [newNotification, ...prev]);
-    if (newNotification.status === 'unread') {
-      setUnreadCount(prev => prev + 1);
+    setNotifications((prev) => [newNotification, ...prev]);
+    if (newNotification.status === "unread") {
+      setUnreadCount((prev) => prev + 1);
     }
   };
 
   const updateNotificationInState = (updatedNotification) => {
-    setNotifications(prev => prev.map(notification =>
-      notification.notification_id === updatedNotification.notification_id 
-        ? updatedNotification 
-        : notification
-    ));
-    
+    setNotifications((prev) =>
+      prev.map((notification) =>
+        notification.notification_id === updatedNotification.notification_id
+          ? updatedNotification
+          : notification,
+      ),
+    );
+
     // Update unread count
-    const unread = notifications.filter(n => n.status === 'unread').length;
+    const unread = notifications.filter((n) => n.status === "unread").length;
     setUnreadCount(unread);
   };
 
   const updateCancellationInState = (updatedCancellation) => {
-    setCancellations(prev => prev.map(cancellation =>
-      cancellation.cancellation_id === updatedCancellation.cancellation_id
-        ? updatedCancellation
-        : cancellation
-    ));
+    setCancellations((prev) =>
+      prev.map((cancellation) =>
+        cancellation.cancellation_id === updatedCancellation.cancellation_id
+          ? updatedCancellation
+          : cancellation,
+      ),
+    );
   };
 
   const updateWalletData = (newWalletData) => {
-    setWalletData(prev => [newWalletData, ...prev]);
+    setWalletData((prev) => [newWalletData, ...prev]);
   };
 
   // Format order helper
@@ -252,12 +262,12 @@ const Dashboard = ({ handleLogout }) => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
       });
     } catch (error) {
       return "Invalid Date";
@@ -304,10 +314,12 @@ const Dashboard = ({ handleLogout }) => {
         setNotifications(response.data.data || []);
         setNotificationError(null);
       } else {
-        throw new Error(response.data.message || "Failed to fetch notifications");
+        throw new Error(
+          response.data.message || "Failed to fetch notifications",
+        );
       }
     } catch (err) {
-      console.error("Error fetching notifications:", err);
+      // console.error("Error fetching notifications:", err);
       setNotificationError(err.response?.data?.message || err.message);
     }
   };
@@ -321,9 +333,9 @@ const Dashboard = ({ handleLogout }) => {
         setUnreadCount(response.data.unread_count || 0);
       }
     } catch (err) {
-      console.error("Error fetching unread count:", err);
+      // console.error("Error fetching unread count:", err);
       // Calculate from local notifications as fallback
-      const unread = notifications.filter(n => n.status === 'unread').length;
+      const unread = notifications.filter((n) => n.status === "unread").length;
       setUnreadCount(unread);
     }
   };
@@ -331,23 +343,30 @@ const Dashboard = ({ handleLogout }) => {
   // -------- Mark Notification as Read --------
   const markNotificationAsRead = async (notificationId) => {
     try {
-      const response = await api.put(`/notifications/${notificationId}/read`, {});
+      const response = await api.put(
+        `/notifications/${notificationId}/read`,
+        {},
+      );
 
       if (response.data.success) {
         // Update local state immediately for better UX
-        setNotifications(prev =>
-          prev.map(notification =>
+        setNotifications((prev) =>
+          prev.map((notification) =>
             notification.notification_id === notificationId
-              ? { ...notification, status: "read", read_at: new Date().toISOString() }
-              : notification
-          )
+              ? {
+                  ...notification,
+                  status: "read",
+                  read_at: new Date().toISOString(),
+                }
+              : notification,
+          ),
         );
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount((prev) => Math.max(0, prev - 1));
       } else {
-        console.error("Failed to mark as read:", response.data.message);
+        // console.error("Failed to mark as read:", response.data.message);
       }
     } catch (err) {
-      console.error("Error marking notification as read:", err);
+      // console.error("Error marking notification as read:", err);
     }
   };
 
@@ -358,17 +377,17 @@ const Dashboard = ({ handleLogout }) => {
 
       if (response.data.success) {
         // Update all notifications to read immediately
-        setNotifications(prev =>
-          prev.map(notification => ({
+        setNotifications((prev) =>
+          prev.map((notification) => ({
             ...notification,
             status: "read",
             read_at: notification.read_at || new Date().toISOString(),
-          }))
+          })),
         );
         setUnreadCount(0);
       }
     } catch (err) {
-      console.error("Error marking all as read:", err);
+      // console.error("Error marking all as read:", err);
     }
   };
 
@@ -379,17 +398,21 @@ const Dashboard = ({ handleLogout }) => {
 
       if (response.data.success) {
         // Remove from local state immediately
-        setNotifications(prev =>
-          prev.filter(notification => notification.notification_id !== notificationId)
+        setNotifications((prev) =>
+          prev.filter(
+            (notification) => notification.notification_id !== notificationId,
+          ),
         );
         // Recalculate unread count
-        const unread = notifications.filter(n => n.status === 'unread').length;
+        const unread = notifications.filter(
+          (n) => n.status === "unread",
+        ).length;
         setUnreadCount(unread);
       } else {
-        console.error("Failed to delete notification:", response.data.message);
+        // console.error("Failed to delete notification:", response.data.message);
       }
     } catch (err) {
-      console.error("Error deleting notification:", err);
+      // console.error("Error deleting notification:", err);
     }
   };
 
@@ -403,14 +426,16 @@ const Dashboard = ({ handleLogout }) => {
         setUnreadCount(0);
       }
     } catch (err) {
-      console.error("Error clearing all notifications:", err);
+      // console.error("Error clearing all notifications:", err);
     }
   };
 
   // Handle notifications update from child component
   const handleNotificationsUpdate = (updatedNotifications) => {
     setNotifications(updatedNotifications);
-    const unread = updatedNotifications.filter(n => n.status === 'unread').length;
+    const unread = updatedNotifications.filter(
+      (n) => n.status === "unread",
+    ).length;
     setUnreadCount(unread);
   };
 
@@ -425,7 +450,7 @@ const Dashboard = ({ handleLogout }) => {
       await fetchUserAddresses();
       await fetchNotifications();
       await fetchUnreadCount();
-      
+
       // Setup real-time updates after initial data load
       setupRealTimeUpdates();
     };
@@ -438,7 +463,7 @@ const Dashboard = ({ handleLogout }) => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
-      
+
       // Clear all polling intervals
       Object.values(pollingIntervalsRef.current).forEach(clearInterval);
     };
@@ -454,7 +479,7 @@ const Dashboard = ({ handleLogout }) => {
         setOrders(formattedOrders);
 
         const unpaid = formattedOrders.filter(
-          (order) => order.status !== "paid" && order.status !== "Completed"
+          (order) => order.status !== "paid" && order.status !== "Completed",
         );
         setUnpaidOrders(unpaid);
 
@@ -534,7 +559,7 @@ const Dashboard = ({ handleLogout }) => {
         eventSourceRef.current.close();
       }
       Object.values(pollingIntervalsRef.current).forEach(clearInterval);
-      
+
       localStorage.clear();
       sessionStorage.clear();
       clearAllCookies();
@@ -544,21 +569,121 @@ const Dashboard = ({ handleLogout }) => {
   };
 
   const confirmLogout = () => {
-    Swal.fire({
-      title: "Are you sure?",
-      text: "Once you log out, you will need to log in again.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#0d6efd",
-      cancelButtonColor: "#dc3545",
-      confirmButtonText: "Yes, log out!",
-      cancelButtonText: "Cancel",
-      reverseButtons: true,
-    }).then((result) => {
-      if (result.isConfirmed) {
-        performLogout();
-      }
+    const swalWithBootstrapButtons = Swal.mixin({
+      customClass: {
+        confirmButton: "btn btn-success",
+        cancelButton: "btn btn-danger",
+      },
+      buttonsStyling: false,
+      showClass: {
+        popup: `
+        animate__animated
+        animate__fadeInUp
+        animate__faster
+      `,
+      },
+      hideClass: {
+        popup: `
+        animate__animated
+        animate__fadeOutDown
+        animate__faster
+      `,
+      },
     });
+
+    swalWithBootstrapButtons
+      .fire({
+        title: "Are you sure?",
+        text: "You won't be able to revert this!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Yes, log out!",
+        cancelButtonText: "No, cancel!",
+        reverseButtons: true,
+      })
+      .then((result) => {
+        if (result.isConfirmed) {
+          performLogout();
+
+          // Success logout modal with timer
+          let timerInterval;
+          Swal.fire({
+            title: "Logged Out!",
+            html: "You have been successfully logged out.<br>Closing in <b></b> seconds.",
+            icon: "success",
+            timer: 2000,
+            timerProgressBar: true,
+            showConfirmButton: false,
+            showClass: {
+              popup: `
+            animate__animated
+            animate__fadeInUp
+            animate__faster
+          `,
+            },
+            hideClass: {
+              popup: `
+            animate__animated
+            animate__fadeOutDown
+            animate__faster
+          `,
+            },
+            didOpen: () => {
+              Swal.showLoading();
+              const timer = Swal.getPopup().querySelector("b");
+              timerInterval = setInterval(() => {
+                timer.textContent = `${(Swal.getTimerLeft() / 2000).toFixed(1)}`;
+              }, 2000);
+            },
+            willClose: () => {
+              clearInterval(timerInterval);
+            },
+          }).then((result) => {
+            if (result.dismiss === Swal.DismissReason.timer) {
+              // console.log("Logout modal closed by timer");
+            }
+          });
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+          // Cancelled modal with timer and animation
+          let timerInterval;
+          Swal.fire({
+            title: "Cancelled",
+            html: "You are still logged in <br>Closing in <b></b> seconds.",
+            icon: "info",
+            timer: 2000,
+            timerProgressBar: true,
+            showConfirmButton: false,
+            showClass: {
+              popup: `
+            animate__animated
+            animate__fadeInUp
+            animate__faster
+          `,
+            },
+            hideClass: {
+              popup: `
+            animate__animated
+            animate__fadeOutDown
+            animate__faster
+          `,
+            },
+            didOpen: () => {
+              Swal.showLoading();
+              const timer = Swal.getPopup().querySelector("b");
+              timerInterval = setInterval(() => {
+                timer.textContent = `${(Swal.getTimerLeft() / 1000).toFixed(1)}`;
+              }, 100);
+            },
+            willClose: () => {
+              clearInterval(timerInterval);
+            },
+          }).then((result) => {
+            if (result.dismiss === Swal.DismissReason.timer) {
+              // console.log("Cancelled modal closed by timer");
+            }
+          });
+        }
+      });
   };
 
   // -------- Payment redirect helpers --------
@@ -690,28 +815,120 @@ const Dashboard = ({ handleLogout }) => {
         reason: finalReason,
       });
 
-      if (response.data.success) {
+      if (response?.data?.success) {
+        // Close the order modal first
+        setShowOrderModal(false);
+
+        // Reset reason states
+        setSelectedReason("");
+        setCustomReason("");
+
+        // ✅ Success modal: FORCE remove OK + auto close timer
+        let timerInterval;
+
         Swal.fire({
           title: "Success!",
-          text: "Your request is in progress. We will get back to you soon.",
+          html: `Your cancellation request has been submitted.<br><br>
+               Closing in <b></b> ms.`,
           icon: "success",
-          confirmButtonColor: "#0d6efd",
+          timer: 2000,
+          timerProgressBar: true,
+
+          // ✅ remove buttons
+          showConfirmButton: false,
+          showCancelButton: false,
+          showDenyButton: false,
+
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+
+          didOpen: () => {
+            // ✅ force hide actions/footer (kills OK button even if overridden globally)
+            const actions = Swal.getActions();
+            if (actions) actions.style.display = "none";
+
+            const confirmBtn = Swal.getConfirmButton();
+            if (confirmBtn) confirmBtn.style.display = "none";
+
+            Swal.showLoading();
+            const timer = Swal.getPopup().querySelector("b");
+            timerInterval = setInterval(() => {
+              timer.textContent = `${Swal.getTimerLeft()}`;
+            }, 100);
+          },
+
+          willClose: () => {
+            clearInterval(timerInterval);
+          },
         });
 
-        setShowOrderModal(false);
-        // Real-time updates will handle the refresh automatically
-      } else {
-        throw new Error(response.data.message || "Failed to cancel order");
+        // ✅ hard fallback close (in case anything tries to keep it open)
+        setTimeout(() => Swal.close(), 2000);
+
+        // Refresh data to show updated status
+        await fetchCancellations();
+        await fetchUserOrders();
       }
     } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to process cancellation";
+
+      // "already has active request"
+      if (
+        msg.toLowerCase().includes("already has an active cancellation request")
+      ) {
+        setShowOrderModal(false);
+
+        // ✅ Info modal: FORCE remove OK + auto close timer
+        let timerInterval;
+
+        Swal.fire({
+          title: "Already Requested",
+          html: `This order already has an active cancellation request.<br><br>
+               Closing in <b></b> ms.`,
+          icon: "info",
+          timer: 2000,
+          timerProgressBar: true,
+
+          showConfirmButton: false,
+          showCancelButton: false,
+          showDenyButton: false,
+
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+
+          didOpen: () => {
+            const actions = Swal.getActions();
+            if (actions) actions.style.display = "none";
+
+            const confirmBtn = Swal.getConfirmButton();
+            if (confirmBtn) confirmBtn.style.display = "none";
+
+            Swal.showLoading();
+            const timer = Swal.getPopup().querySelector("b");
+            timerInterval = setInterval(() => {
+              timer.textContent = `${Swal.getTimerLeft()}`;
+            }, 100);
+          },
+
+          willClose: () => {
+            clearInterval(timerInterval);
+          },
+        });
+
+        setTimeout(() => Swal.close(), 2000);
+        return;
+      }
+
+      // Other errors (keep OK)
       Swal.fire({
         title: "Error",
-        text:
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to process cancellation",
+        text: msg,
         icon: "error",
         confirmButtonColor: "#0d6efd",
+        confirmButtonText: "OK",
       });
     }
   };
@@ -727,9 +944,46 @@ const Dashboard = ({ handleLogout }) => {
       return;
     }
 
+    // First, check if there's already a pending cancellation
+    const hasPendingCancellation = cancellations.some(
+      (c) => c.order_id === selectedOrder.id && c.status === "pending",
+    );
+
+    if (hasPendingCancellation) {
+      let timerInterval;
+      Swal.fire({
+        title: "Cancellation Already Pending",
+        html: `
+        <div class="text-center">
+          <i class="bi bi-info-circle-fill text-info fs-1 mb-3"></i>
+          <p class="mb-2">This order already has a pending cancellation request.</p>
+          <p class="mb-0">Closing in <b></b> seconds.</p>
+        </div>
+      `,
+        icon: "info",
+        timer: 3000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+          const timer = Swal.getPopup().querySelector("b");
+          timerInterval = setInterval(() => {
+            const secondsLeft = (Swal.getTimerLeft() / 1000).toFixed(1);
+            timer.textContent = secondsLeft;
+          }, 100);
+        },
+        willClose: () => {
+          clearInterval(timerInterval);
+        },
+      });
+      return;
+    }
+
+    // Proceed with confirmation if no pending cancellation
     Swal.fire({
       title: "Confirm Cancellation",
-      html: `Are you sure you want to cancel order?`,
+      html: `Are you sure you want to cancel order <strong>#${selectedOrder?.id}</strong>?`,
       icon: "question",
       showCancelButton: true,
       confirmButtonColor: "#0d6efd",
@@ -737,6 +991,20 @@ const Dashboard = ({ handleLogout }) => {
       confirmButtonText: "Yes, cancel order",
       cancelButtonText: "No, keep it",
       reverseButtons: true,
+      showClass: {
+        popup: `
+        animate__animated
+        animate__fadeInUp
+        animate__faster
+      `,
+      },
+      hideClass: {
+        popup: `
+        animate__animated
+        animate__fadeOutDown
+        animate__faster
+      `,
+      },
     }).then((result) => {
       if (result.isConfirmed) {
         handleCancelOrder();
@@ -808,16 +1076,16 @@ const Dashboard = ({ handleLogout }) => {
       await fetchNotifications();
       await fetchUnreadCount();
       setLastUpdate(new Date());
-      
+
       Swal.fire({
         title: "Refreshed!",
         text: "All data has been updated.",
         icon: "success",
         confirmButtonColor: "#0d6efd",
-        timer: 1500
+        timer: 1500,
       });
     } catch (error) {
-      console.error("Error refreshing data:", error);
+      // console.error("Error refreshing data:", error);
     }
   };
 
@@ -829,7 +1097,7 @@ const Dashboard = ({ handleLogout }) => {
 
       case "addresses":
         return (
-          <AddressTab 
+          <AddressTab
             user={user}
             userAddresses={userAddresses}
             onAddressesUpdate={setUserAddresses}
@@ -841,7 +1109,7 @@ const Dashboard = ({ handleLogout }) => {
           <div className="table-container">
             <div className="d-flex justify-content-between align-items-center py-3">
               <h4 className="fw-bold heading m-0">My Wallet</h4>
-              <button 
+              <button
                 className="btn btn-outline-primary btn-sm rounded-0"
                 onClick={refreshAllData}
               >
@@ -869,7 +1137,7 @@ const Dashboard = ({ handleLogout }) => {
                         <div>
                           <span
                             className={`badge ${getWalletStatusBadgeClass(
-                              transaction.status
+                              transaction.status,
                             )} text-white text-capitalize rounded-0`}
                           >
                             {transaction.status}
@@ -899,7 +1167,7 @@ const Dashboard = ({ handleLogout }) => {
                               <p className="mb-0 text-muted small">
                                 Processed:{" "}
                                 {new Date(
-                                  transaction.created_at
+                                  transaction.created_at,
                                 ).toLocaleDateString()}
                               </p>
                             </div>
@@ -934,7 +1202,7 @@ const Dashboard = ({ handleLogout }) => {
           <div className="table-container">
             <div className="d-flex justify-content-between align-items-center py-3">
               <h4 className="fw-bold heading m-0">My Orders</h4>
-              <button 
+              <button
                 className="btn btn-outline-primary btn-sm rounded-0"
                 onClick={refreshAllData}
               >
@@ -972,7 +1240,7 @@ const Dashboard = ({ handleLogout }) => {
           <div className="table-container">
             <div className="d-flex justify-content-between align-items-center py-3">
               <h4 className="fw-bold heading m-0">Unpaid Orders</h4>
-              <button 
+              <button
                 className="btn btn-outline-primary btn-sm rounded-0"
                 onClick={refreshAllData}
               >
@@ -1068,10 +1336,66 @@ const Dashboard = ({ handleLogout }) => {
 
   return (
     <>
+      <Helmet>
+        {/* Basic SEO */}
+        <title>
+          Profile Dashboard | Adroit Alarm Systems 
+        </title>
+        <meta
+          name="description"
+          content="ADROIT is a premier Australian security company specializing in Electronic Security, Home Automation, Audio Visual, Data Cabling, and Ducted Vacuum systems. ASIAL accredited with 20+ years of experience delivering integrated, hassle-free solutions."
+        />
+        <meta
+          name="keywords"
+          content="ADROIT, Adroit Alarm System, security companies Australia, electronic security Sydney, home automation Australia, audio visual installation, data cabling contractors, ducted vacuum systems, ASIAL Silver Member, security license holders, integrated security solutions, Dynalite certified, commercial security, residential automation, access control, CCTV installation Australia"
+        />
+        <meta name="author" content="ADROIT Alarm Systems Australia" />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://shop.adroitalarm.com.au/" />
+
+        {/* Open Graph */}
+        <meta
+          property="og:title"
+          content="ADROIT Alarm Systems | Electronic Security & Automation Experts"
+        />
+        <meta
+          property="og:description"
+          content="Since 2008, ADROIT has delivered premium integrated solutions including security, automation, and AV. Fully licensed (Master License No: 000101930) and ASIAL accredited."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://shop.adroitalarm.com.au/" />
+        <meta property="og:site_name" content="ADROIT Alarm Systems" />
+
+        {/* Social Links */}
+        <meta
+          property="og:see_also"
+          content="https://www.instagram.com/adroitalarm/"
+        />
+        <meta
+          property="og:see_also"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Facebook  */}
+        <meta property="fb:app_id" content="#" />
+        <meta
+          property="fb:admins"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Instagram */}
+        <meta name="instagram:title" content="ADROIT Alarm Systems Australia" />
+        <meta
+          name="instagram:description"
+          content="Integrated solutions in electronic security, automation, audio visual and data cabling. Trusted Australian security specialists since 2008."
+        />
+        <meta name="instagram:site" content="@adroitalarm" />
+      </Helmet>
+
       <PageHeader title="Shop" path="Home / Dashboard" />
-      
+
       {/* Connection Status Indicator */}
-      <div className="container-fluid bg-light py-2 border-bottom">
+      <div className="container-fluid bg-light py-2">
         <div className="container">
           <div className="row align-items-center">
             {/* <div className="col-md-6">
@@ -1097,8 +1421,8 @@ const Dashboard = ({ handleLogout }) => {
 
       <div className="container py-4">
         <div className="row">
-          <div className="col-md-3 p-0">
-            <div className="d-flex align-items-center p-3 gap-3">
+          <div className="col-md-3 bg-light border p-0">
+            <div className="d-flex border-bottom align-items-center p-3 gap-3">
               <div
                 className="bg-white border text-white rounded-circle d-flex align-items-center justify-content-center"
                 style={{ width: "50px", height: "50px", overflow: "hidden" }}
@@ -1141,8 +1465,14 @@ const Dashboard = ({ handleLogout }) => {
                   </>
                 ) : (
                   <>
-                    <div className="mb-1 bg-light rounded" style={{ width: "160px", height: "16px" }} />
-                    <div className="bg-light rounded" style={{ width: "140px", height: "14px" }} />
+                    <div
+                      className="mb-1 bg-light rounded"
+                      style={{ width: "160px", height: "16px" }}
+                    />
+                    <div
+                      className="bg-light rounded"
+                      style={{ width: "140px", height: "14px" }}
+                    />
                   </>
                 )}
               </div>
@@ -1150,7 +1480,7 @@ const Dashboard = ({ handleLogout }) => {
 
             <ul className="list-group heading rounded-0 d-none d-md-block">
               <li
-                className={`list-group-item border-0 p-2 ${
+                className={`list-group-item bg-light border-0 p-2 ${
                   activeTab === "dashboard"
                     ? "active text-primary active-tab ps-1"
                     : ""
@@ -1162,7 +1492,7 @@ const Dashboard = ({ handleLogout }) => {
                 Dashboard
               </li>
               <li
-                className={`list-group-item border-0 p-2 ${
+                className={`list-group-item bg-light border-0 p-2 ${
                   activeTab === "notifications"
                     ? "active text-primary ps-1 active-tab"
                     : ""
@@ -1179,7 +1509,7 @@ const Dashboard = ({ handleLogout }) => {
                 )}
               </li>
               <li
-                className={`list-group-item border-0 p-2${
+                className={`list-group-item bg-light border-0 p-2${
                   activeTab === "orders"
                     ? "active text-primary active-tab ps-1"
                     : ""
@@ -1191,7 +1521,7 @@ const Dashboard = ({ handleLogout }) => {
                 My Orders
               </li>
               <li
-                className={`list-group-item border-0 p-2 ${
+                className={`list-group-item bg-light border-0 p-2 ${
                   activeTab === "unpaidOrders"
                     ? "active text-primary active-tab ps-1"
                     : ""
@@ -1204,7 +1534,7 @@ const Dashboard = ({ handleLogout }) => {
               </li>
 
               <li
-                className={`list-group-item border-0 p-2 ${
+                className={`list-group-item bg-light border-0 p-2 ${
                   activeTab === "refund"
                     ? "active text-primary ps-1 active-tab"
                     : ""
@@ -1217,7 +1547,7 @@ const Dashboard = ({ handleLogout }) => {
               </li>
 
               <li
-                className={`list-group-item border-0 p-2${
+                className={`list-group-item bg-light border-0 p-2${
                   activeTab === "addresses"
                     ? "active text-primary active-tab ps-1"
                     : ""
@@ -1230,7 +1560,7 @@ const Dashboard = ({ handleLogout }) => {
               </li>
 
               <li
-                className={`list-group-item border-0 p-2 ${
+                className={`list-group-item bg-light border-0 p-2 ${
                   activeTab === "approvedReviews"
                     ? "active text-primary ps-1 active-tab"
                     : ""
@@ -1242,7 +1572,7 @@ const Dashboard = ({ handleLogout }) => {
                 My Reviews
               </li>
               <li
-                className={`list-group-item border-0 p-2${
+                className={`list-group-item bg-light border-0 p-2${
                   activeTab === "reviews"
                     ? "active text-primary active-tab ps-1"
                     : ""
@@ -1253,10 +1583,9 @@ const Dashboard = ({ handleLogout }) => {
                 <i className="bi bi-chat-left-text p-2 me-2 fs-4 text-primary"></i>
                 To Be Reviews
               </li>
-              
 
               <li
-                className={`list-group-item border-0 p-2 ${
+                className={`list-group-item bg-light border-0 p-2 ${
                   activeTab === "logout"
                     ? "active text-primary ps-1 active-tab"
                     : ""
@@ -1353,8 +1682,13 @@ const Dashboard = ({ handleLogout }) => {
             </div>
           </div>
 
-          <div className="col-md-9 content-scrollable" ref={contentRef}>
-            <div className="mx-3 p-0 p-md-3">{renderContent()}</div>
+          <div className="col-md-9">
+            <div
+              className="bg-light border content-scrollable"
+              ref={contentRef}
+            >
+              <div className="mx-3 p-0 p-md-3">{renderContent()}</div>
+            </div>
           </div>
         </div>
       </div>

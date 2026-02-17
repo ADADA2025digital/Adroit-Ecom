@@ -320,14 +320,14 @@ function PaymentForm() {
       case "visa":
         return (
           <>
-            <p className="cardheading position-absolute">VISA</p>
+            {/* <p className="cardheading position-absolute">VISA</p> */}
             <VisaSVG />
           </>
         );
       case "mastercard":
         return (
           <>
-            <p className="cardheading position-absolute">MASTERCARD</p>
+            {/* <p className="cardheading position-absolute">MASTERCARD</p> */}
             <MastercardSVG />
           </>
         );
@@ -344,7 +344,7 @@ function PaymentForm() {
       case "unionpay":
         return <p className="cardheading position-absolute">UNIONPAY</p>;
       default:
-        return <p className="cardheading position-absolute">CARD</p>;
+        return <p className="cardheading position-absolute text-end">CARD</p>;
     }
   };
 
@@ -450,7 +450,9 @@ function PaymentForm() {
             {/* Card Preview */}
             <div className="atm-card bg-transparent mb-4 text-white">
               <div className="atm-card-front rounded-4 position-absolute d-flex flex-column justify-content-center w-100 h-100 p-3">
+                <div className="d-flex align-items-end">
                 <BrandBadge />
+</div>
 
                 {/* Chip */}
                 <svg

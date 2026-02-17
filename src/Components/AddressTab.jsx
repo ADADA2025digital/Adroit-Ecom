@@ -35,49 +35,83 @@ const AddressTab = ({ user, userAddresses: initialAddresses, onAddressesUpdate }
   };
 
   // -------- Address Deletion --------
-  // -------- Address Deletion --------
-  const handleDeleteAddress = async (addressId) => {
-    try {
-      const response = await api.delete(`/address/${addressId}/delete`);
+const handleDeleteAddress = async (addressId) => {
+  try {
+    const response = await api.delete(`/address/${addressId}/delete`);
 
-      if (response.data.status === 200) {
-        Swal.fire({
-          title: "Success!",
-          text: "Address deleted successfully.",
-          icon: "success",
-          confirmButtonColor: "#0d6efd",
-        });
-        fetchUserAddresses(); // Refresh the list
-      } else {
-        throw new Error(response.data.message || "Failed to delete address");
-      }
-    } catch (err) {
-      // console.error("Address deletion error:", err);
-      Swal.fire({
-        title: "Error",
-        text: err.response?.data?.message || err.message || "Failed to delete address",
-        icon: "error",
-        confirmButtonColor: "#0d6efd",
+    if (response.data.status === 200) {
+      // Success modal with timer and animation - no OK button
+      let timerInterval;
+      await Swal.fire({
+        title: "Success!",
+        html: "Address deleted successfully.<br>Closing in <b></b> seconds.",
+        icon: "success",
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+        showClass: {
+          popup: `
+            animate__animated
+            animate__fadeInUp
+            animate__faster
+          `
+        },
+        hideClass: {
+          popup: `
+            animate__animated
+            animate__fadeOutDown
+            animate__faster
+          `
+        },
+        didOpen: () => {
+          Swal.showLoading();
+          const timer = Swal.getPopup().querySelector("b");
+          timerInterval = setInterval(() => {
+            const timerLeft = Swal.getTimerLeft();
+            timer.textContent = timerLeft ? (timerLeft / 1000).toFixed(1) : "0";
+          }, 100);
+        },
+        willClose: () => {
+          clearInterval(timerInterval);
+        }
+      }).then((result) => {
+        if (result.dismiss === Swal.DismissReason.timer) {
+          // console.log("Address delete modal closed by timer");
+        }
       });
+      
+      fetchUserAddresses(); // Refresh the list
+    } else {
+      throw new Error(response.data.message || "Failed to delete address");
     }
-  };
-  const confirmDeleteAddress = (addressId) => {
+  } catch (err) {
+    // console.error("Address deletion error:", err);
     Swal.fire({
-      title: "Are you sure?",
-      text: "You won't be able to recover this address!",
-      icon: "warning",
-      showCancelButton: true,
+      title: "Error",
+      text: err.response?.data?.message || err.message || "Failed to delete address",
+      icon: "error",
       confirmButtonColor: "#0d6efd",
-      cancelButtonColor: "#dc3545",
-      confirmButtonText: "Yes, delete it!",
-      cancelButtonText: "Cancel",
-      reverseButtons: true,
-    }).then((result) => {
-      if (result.isConfirmed) {
-        handleDeleteAddress(addressId);
-      }
     });
-  };
+  }
+};
+
+const confirmDeleteAddress = (addressId) => {
+  Swal.fire({
+    title: "Are you sure?",
+    text: "You won't be able to recover this address!",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#0d6efd",
+    cancelButtonColor: "#dc3545",
+    confirmButtonText: "Yes, delete it!",
+    cancelButtonText: "Cancel",
+    reverseButtons: true,
+  }).then((result) => {
+    if (result.isConfirmed) {
+      handleDeleteAddress(addressId);
+    }
+  });
+};
 
   // -------- Address Edit, Copy --------
   const openEditAddress = (addr) => {

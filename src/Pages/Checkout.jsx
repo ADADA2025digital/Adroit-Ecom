@@ -9,7 +9,7 @@ import GlobalButton from "../Components/Button";
 const CheckoutPage = () => {
   const { cart = [], clearCart } = useCart();
   const [selectedShippingAddress, setSelectedShippingAddress] = useState(null);
-  const [selectedPayment, setSelectedPayment] = useState("");
+  const [selectedPayment, setSelectedPayment] = useState("STRIPE");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const navigate = useNavigate();
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -18,6 +18,10 @@ const CheckoutPage = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
+  
+  // Add state for address error and show warning after click
+  const [addressError, setAddressError] = useState("");
+  const [showAddressWarning, setShowAddressWarning] = useState(false);
 
   const [checkoutInput, setCheckoutInput] = useState({
     user_id: "",
@@ -27,9 +31,7 @@ const CheckoutPage = () => {
     phone: "",
   });
 
-  const paymentMethods = [
-    { id: "STRIPE", name: "Credit/Debit Card" },
-  ];
+  const paymentMethods = [{ id: "STRIPE", name: "Credit/Debit Card" }];
 
   const formatImageUrl = (imgPath) => {
     if (!imgPath) return "/placeholder.jpg";
@@ -80,13 +82,14 @@ const CheckoutPage = () => {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           });
-         
+
           if (addressesResponse.data.status === 200) {
             setAddresses(addressesResponse.data.data);
-            if (addressesResponse.data.data.length > 0) {
-              setSelectedShippingAddress(String(addressesResponse.data.data[0].id));
-            } else {
+            
+            // Just check if addresses exist or show form
+            if (addressesResponse.data.data.length === 0) {
               setShowAddressForm(true);
+              setAddressError("Please add a shipping address");
             }
           }
           setIsLoadingAddresses(false);
@@ -140,14 +143,14 @@ const CheckoutPage = () => {
   const subTotal = cartItems.reduce(
     (total, item) =>
       total + (parseFloat(item.pro_price) * parseInt(item.pro_quantity) || 0),
-    0
+    0,
   );
 
   const total = subTotal;
 
   const prepareOrderData = () => {
     const selectedAddress = addresses.find(
-      (addr) => String(addr.id) === String(selectedShippingAddress)
+      (addr) => String(addr.id) === String(selectedShippingAddress),
     );
 
     if (!selectedAddress) {
@@ -203,7 +206,7 @@ const CheckoutPage = () => {
         } catch {
           return it;
         }
-      })
+      }),
     );
     return { ...base, items: resolvedItems };
   };
@@ -234,11 +237,11 @@ const CheckoutPage = () => {
 
         localStorage.setItem(
           "ordered_products",
-          JSON.stringify(orderedProducts)
+          JSON.stringify(orderedProducts),
         );
-       
+
         await clearCart();
-       
+
         navigate("/order-success");
       } else {
         throw new Error(response.data.message || "Order failed");
@@ -248,7 +251,7 @@ const CheckoutPage = () => {
       if (error.response?.status === 422) {
         setValidationErrors(error.response.data.errors || {});
         alert(
-          "Validation errors: " + JSON.stringify(error.response.data.errors)
+          "Validation errors: " + JSON.stringify(error.response.data.errors),
         );
       } else {
         alert(`Order failed: ${error.message}`);
@@ -274,7 +277,7 @@ const CheckoutPage = () => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-        }
+        },
       );
 
       if (!orderResponse.data?.order_id) {
@@ -288,7 +291,7 @@ const CheckoutPage = () => {
           amount: total.toFixed(2),
           currency: "aud",
           user_id: checkoutInput.user_id,
-        })
+        }),
       );
 
       // If this was a Buy Now flow, do not clear entire cart; just proceed
@@ -303,7 +306,7 @@ const CheckoutPage = () => {
       if (error.response?.status === 422) {
         setValidationErrors(error.response.data.errors || {});
         alert(
-          "Validation errors: " + JSON.stringify(error.response.data.errors)
+          "Validation errors: " + JSON.stringify(error.response.data.errors),
         );
       } else {
         alert(error.message || "Payment processing failed");
@@ -315,22 +318,52 @@ const CheckoutPage = () => {
   const placeOrder = async () => {
     setIsPlacingOrder(true);
     setValidationErrors({});
+    setAddressError(""); // Clear previous address error
+    
     try {
       if (cartItems.length === 0) {
-        throw new Error("Your cart is empty. Please add items before proceeding.");
+        throw new Error(
+          "Your cart is empty. Please add items before proceeding.",
+        );
       }
 
+      // Check if user is logged in
+      if (!isLoggedIn) {
+        throw new Error("Please login to continue with checkout");
+      }
+
+      // Check if addresses exist
+      if (addresses.length === 0) {
+        setAddressError("No addresses found. Please add a shipping address.");
+        setShowAddressForm(true);
+        setShowAddressWarning(true);
+        throw new Error("Please add a shipping address");
+      }
+
+      // Check if an address is selected
       if (!selectedShippingAddress) {
+        setAddressError("Please select a shipping address");
+        setShowAddressWarning(true);
         throw new Error("Please select a shipping address");
       }
 
+      // Verify the selected address exists
       const addressExists = addresses.find(
-        (addr) => String(addr.id) === String(selectedShippingAddress)
+        (addr) => String(addr.id) === String(selectedShippingAddress),
       );
-     
+
       if (!addressExists) {
-        throw new Error("The selected address is no longer available. Please select a different address.");
+        setAddressError(
+          "The selected address is no longer available. Please select a different address.",
+        );
+        setShowAddressWarning(true);
+        throw new Error(
+          "The selected address is no longer available. Please select a different address.",
+        );
       }
+
+      // Clear warning if address is valid
+      setShowAddressWarning(false);
 
       if (!selectedPayment) {
         throw new Error("Please select a payment method");
@@ -346,12 +379,16 @@ const CheckoutPage = () => {
       localStorage.removeItem("buy_now_item");
     } catch (error) {
       // console.error("Order Placement Error:", error);
-      alert(`Order failed: ${error.message}`);
+      // Don't show alert for address errors since we're showing the warning
+      if (!error.message.includes("address") && !error.message.includes("Address")) {
+        alert(`Order failed: ${error.message}`);
+      }
       setIsPlacingOrder(false);
     }
   };
 
   const handlePlaceOrder = () => {
+    setShowAddressWarning(false); // Reset warning before attempting order
     placeOrder();
   };
 
@@ -359,6 +396,14 @@ const CheckoutPage = () => {
     setAddresses([...addresses, newAddress]);
     setSelectedShippingAddress(String(newAddress.id));
     setShowAddressForm(false);
+    setAddressError(""); // Clear error when address is added
+    setShowAddressWarning(false); // Clear warning when address is added
+  };
+
+  const handleAddressSelect = (addressId) => {
+    setSelectedShippingAddress(addressId);
+    setAddressError(""); // Clear error when address is selected
+    setShowAddressWarning(false); // Clear warning when address is selected
   };
 
   return (
@@ -405,45 +450,47 @@ const CheckoutPage = () => {
                   </div>
                 </div>
 
-                {addresses.length > 0 && !showAddressForm ? (
-                  <CheckoutCardSection
-                    title="Shipping Address"
-                    options={addresses}
-                    selectedOption={String(selectedShippingAddress)}
-                    onSelect={(addressId) => {
-                      setSelectedShippingAddress(addressId);
-                    }}
-                    onAddressAdded={handleAddressAdded}
-                  />
-                ) : (
-                  <div className="card border-0 bg-light mb-4">
-                    <div className="card-body p-4 text-start">
-                      <h5 className="fw-bold">Shipping Address</h5>
-                      {showAddressForm ? (
-                        <CheckoutCardSection
-                          options={addresses}
-                          selectedOption={String(selectedShippingAddress)}
-                          onSelect={(addressId) => {
-                            setSelectedShippingAddress(addressId);
-                          }}
-                          onAddressAdded={handleAddressAdded}
-                        />
-                      ) : (
-                        <>
-                          <p>
-                            No addresses found. Please add an address to continue.
-                          </p>
-                          <button
-                            className="btn btn-primary rounded-0"
-                            onClick={() => setShowAddressForm(true)}
-                          >
-                            Add New Address
-                          </button>
-                        </>
-                      )}
-                    </div>
+                {/* Shipping Address Section with Error Display */}
+                <div className="card border-0 bg-light mb-4">
+                  <div className="card-body p-4 text-start">
+                    <h5 className="fw-bold mb-3 heading">Shipping Address</h5>                   
+                    
+                    {addresses.length > 0 && !showAddressForm ? (
+                      <CheckoutCardSection
+                        title="Shipping Address"
+                        options={addresses}
+                        selectedOption={String(selectedShippingAddress)}
+                        onSelect={handleAddressSelect}
+                        onAddressAdded={handleAddressAdded}
+                      />
+                    ) : (
+                      <>
+                        {showAddressForm ? (
+                          <CheckoutCardSection
+                            options={addresses}
+                            selectedOption={String(selectedShippingAddress)}
+                            onSelect={handleAddressSelect}
+                            onAddressAdded={handleAddressAdded}
+                          />
+                        ) : (
+                          <>
+                            <p className="text-muted">
+                              No addresses found. Please add an address to
+                              continue.
+                            </p>
+                            <button
+                              className="btn btn-primary rounded-0"
+                              onClick={() => setShowAddressForm(true)}
+                            >
+                              Add New Address
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                                     
                   </div>
-                )}
+                </div>
               </>
             )}
 
@@ -528,7 +575,9 @@ const CheckoutPage = () => {
             </div>
 
             <div className="card rounded-0 bg-light border mt-3 p-3">
-              <h4 className="fw-bold border-bottom pb-3 heading">Billing Summary</h4>
+              <h4 className="fw-bold border-bottom pb-3 heading">
+                Billing Summary
+              </h4>
               <div className="mt-4">
                 <div className="d-flex justify-content-between mb-2">
                   <span className="text-muted">Subtotal (Tax included)</span>
@@ -546,10 +595,17 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
+              {/* Show address warning after user clicks place order without selecting address */}
+              {showAddressWarning && (
+                <div className="alert alert-warning mt-3 mb-0" role="alert">
+                  <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                  Please select a shipping address to place your order.
+                </div>
+              )}
+
               <GlobalButton
                 disabled={
                   isPlacingOrder ||
-                  !selectedShippingAddress ||
                   !selectedPayment ||
                   cartItems.length === 0 ||
                   isLoadingAddresses

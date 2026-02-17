@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { Helmet } from "react-helmet-async";
 import PageHeader from "../Components/PageHeader";
-import Banner from "../Assets/Images/banner.png";
+import Banner from "../Assets/Images/1.png";
 import ProductCard from "../Components/ProductCard";
 import { fetchProducts } from "../Constants/Data";
 import PageBanner from "../Components/PageBanner";
-import api from '../Config/api';
-import PageLoader from "../Components/PageLoader";
+import api from "../Config/api";
 import { CgLayoutGrid } from "react-icons/cg";
 import { TfiLayoutGrid3Alt, TfiLayoutGrid4Alt } from "react-icons/tfi";
+import { Range } from "react-range";
+import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 const Shop = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,15 +20,143 @@ const Shop = () => {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
-  // Removed unused imageLoading state
+  const [selectedRatings, setSelectedRatings] = useState([]);
   const [gridView, setGridView] = useState("grid-4");
   const [loading, setLoading] = useState(true);
+  const [priceRange, setPriceRange] = useState([50, 5000]);
+  const [debouncedPriceRange, setDebouncedPriceRange] = useState([50, 5000]);
 
-  const hideLoader = () => {
-    setLoading(false);
+  // State for custom dropdowns
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [isItemsPerPageOpen, setIsItemsPerPageOpen] = useState(false);
+
+  // State for collapsible sections
+  const [collapsedSections, setCollapsedSections] = useState({
+    categories: false,
+    ratings: false,
+    priceRange: false,
+  });
+
+  // Toggle section collapse
+  const toggleSection = (section) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
   };
 
-  // Memoized filtered products
+  // Debounce price range changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPriceRange(priceRange);
+      setCurrentPage(1);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [priceRange]);
+
+  // Add animation styles to head
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      @keyframes shine {
+        0% { background-position: 100% 0; }
+        100% { background-position: 0 0; }
+      }
+      
+      .filter-section-content {
+        transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        height: 180px !important;
+        overflow-y: auto !important;
+      }   
+      
+      .filter-section-content.collapsed {
+        opacity: 0;
+        visibility: hidden;
+      }
+      
+      .filter-section-header {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }   
+      
+      .filter-arrow {
+        transition: transform 0.3s ease;
+      }
+
+      .rotate-180 {
+        transform: rotate(180deg);
+      }
+      
+      .custom-select {
+        appearance: none !important;
+        background-image: none !important;
+        background: white !important;
+        padding: 0.375rem 0.75rem !important;
+        cursor: pointer;
+      }
+      
+      .custom-select .filter-arrow {
+        pointer-events: none;
+      }
+      
+      .custom-select-dropdown {
+        top: 100%;
+        z-index: 1060;
+        margin-top: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      
+      .custom-select-option {
+        padding: 0.375rem 0.75rem;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      
+      .custom-select-option:hover {
+        background-color: #f8f9fa;
+      }
+      
+      .custom-select-option.selected {
+        background-color: #0d6efd;
+        color: white;
+      }
+      
+      .custom-select-option.selected:hover {
+        background-color: #0b5ed7;
+      }
+
+      .sort-dropdown .custom-select-option:last-child {
+        border-bottom: 3px solid #0d6efd;
+      }
+
+      .items-dropdown .custom-select-option:last-child {
+        border-bottom: 3px solid #0d6efd;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, []);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        !event.target.closest(".sort-dropdown") &&
+        !event.target.closest(".items-dropdown")
+      ) {
+        setIsSortOpen(false);
+        setIsItemsPerPageOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Memoized filtered products by search, price, categories, and ratings
   const filteredProducts = useMemo(() => {
     if (!Array.isArray(products)) {
       return [];
@@ -34,9 +164,32 @@ const Shop = () => {
 
     return products.filter((product) => {
       const name = product.productname ? product.productname.toLowerCase() : "";
-      return name.includes(searchQuery.toLowerCase());
+      const matchesSearch = name.includes(searchQuery.toLowerCase());
+
+      const productPrice = parseFloat(product.pro_price || 0);
+      const matchesPrice =
+        productPrice >= debouncedPriceRange[0] &&
+        productPrice <= debouncedPriceRange[1];
+
+      const matchesCategory =
+        selectedCategories.length === 0 ||
+        selectedCategories.includes(product.category_id);
+
+      const matchesRating =
+        selectedRatings.length === 0 ||
+        selectedRatings.some(
+          (rating) => product.rating && product.rating >= rating,
+        );
+
+      return matchesSearch && matchesPrice && matchesCategory && matchesRating;
     });
-  }, [products, searchQuery]);
+  }, [
+    products,
+    searchQuery,
+    debouncedPriceRange,
+    selectedCategories,
+    selectedRatings,
+  ]);
 
   // Memoized sorted products
   const sortedProducts = useMemo(() => {
@@ -48,19 +201,19 @@ const Shop = () => {
 
     if (sortOrder === "Ascending Order") {
       sorted.sort((a, b) =>
-        (a.productname || "").localeCompare(b.productname || "")
+        (a.productname || "").localeCompare(b.productname || ""),
       );
     } else if (sortOrder === "Descending Order") {
       sorted.sort((a, b) =>
-        (b.productname || "").localeCompare(a.productname || "")
+        (b.productname || "").localeCompare(a.productname || ""),
       );
     } else if (sortOrder === "Low - High Price") {
       sorted.sort(
-        (a, b) => parseFloat(a.pro_price || 0) - parseFloat(b.pro_price || 0)
+        (a, b) => parseFloat(a.pro_price || 0) - parseFloat(b.pro_price || 0),
       );
     } else if (sortOrder === "High - Low Price") {
       sorted.sort(
-        (a, b) => parseFloat(b.pro_price || 0) - parseFloat(a.pro_price || 0)
+        (a, b) => parseFloat(b.pro_price || 0) - parseFloat(a.pro_price || 0),
       );
     }
     return sorted;
@@ -73,9 +226,24 @@ const Shop = () => {
   const paginatedProducts = useMemo(() => {
     return sortedProducts.slice(
       (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage
+      currentPage * itemsPerPage,
     );
   }, [sortedProducts, currentPage, itemsPerPage]);
+
+  // Get min and max price from products for range slider
+  const priceBounds = useMemo(() => {
+    if (!Array.isArray(products) || products.length === 0) {
+      return { min: 50, max: 5000 };
+    }
+
+    const prices = products
+      .map((p) => parseFloat(p.pro_price || 0))
+      .filter((p) => p > 0);
+    return {
+      min: Math.min(50, ...prices),
+      max: Math.max(5000, ...prices),
+    };
+  }, [products]);
 
   // Get grid column classes based on selected view
   const getGridClasses = () => {
@@ -90,66 +258,35 @@ const Shop = () => {
     }
   };
 
+  // Fetch categories on mount
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const response = await api.get("/getcategory");
         setCategories(response.data);
       } catch (err) {
-        console.error("Error fetching categories:", err);
-        // Optionally handle error here (e.g., show a toast or log)
-        setTimeout(hideLoader, 1000);
+        // console.error("Error fetching categories:", err);
       }
     };
 
     fetchCategories();
   }, []);
 
+  // Fetch products based on selected categories
   useEffect(() => {
-    console.log("🔥 Products State Changed:", products);
-  }, [products]);
-
-  useEffect(() => {
-    const loadProducts = async () => {
-      setLoading(true);
-      try {
-        const data = await fetchProducts();
-        console.log("Fetched Products:", data);
-
-        if (data.length === 0) {
-          console.warn("⚠️ No products found, state is empty");
-        } else {
-          console.log("✅ Setting products state:", data);
-        }
-
-        setProducts(data);
-      } catch (err) {
-        console.error("❌ Error fetching products:", err);
-        setProducts([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProducts();
-  }, []);
-
-  useEffect(() => {
-    const fetchProductsByCategory = async () => {
+    const fetchProductsData = async () => {
       setLoading(true);
       try {
         if (selectedCategories.length > 0) {
           const categoryParam = selectedCategories.join(",");
           const response = await api.get(`/category/${categoryParam}/products`);
 
-          console.log("✅ API Response:", response.data);
-
           const productsWithImages = response.data.map((product) => ({
             ...product,
             imageUrl: product.image
               ? `https://shop.adroitalarm.com.au/storage/${product.image.replace(
                   "public/storage/",
-                  ""
+                  "",
                 )}`
               : "https://via.placeholder.com/300",
           }));
@@ -160,23 +297,30 @@ const Shop = () => {
           setProducts(data);
         }
       } catch (err) {
-        console.error("Error fetching products by category:", err);
-        console.error("Error fetching products by category:", err);
-        // Optionally handle error here (e.g., show a toast or log)
+        // console.error("Error fetching products:", err);
+        setProducts([]);
       } finally {
         setLoading(false);
-        setTimeout(hideLoader, 1000);
       }
     };
 
-    fetchProductsByCategory();
+    fetchProductsData();
   }, [selectedCategories]);
 
   const handleCategorySelection = (categoryId) => {
     setSelectedCategories((prevSelected) =>
       prevSelected.includes(categoryId)
         ? prevSelected.filter((id) => id !== categoryId)
-        : [...prevSelected, categoryId]
+        : [...prevSelected, categoryId],
+    );
+    setCurrentPage(1);
+  };
+
+  const handleRatingSelection = (rating) => {
+    setSelectedRatings((prevSelected) =>
+      prevSelected.includes(rating)
+        ? prevSelected.filter((r) => r !== rating)
+        : [...prevSelected, rating],
     );
     setCurrentPage(1);
   };
@@ -187,8 +331,24 @@ const Shop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Handle price range change
+  const handlePriceRangeChange = (values) => {
+    setPriceRange(values);
+  };
+
+  // Reset all filters
+  const resetAllFilters = () => {
+    setSelectedCategories([]);
+    setSelectedRatings([]);
+    setPriceRange([50, 5000]);
+    setDebouncedPriceRange([50, 5000]);
+    setSearchQuery("");
+    setSortOrder("Ascending Order");
+    setCurrentPage(1);
+  };
+
   // Generate page numbers for pagination
-  const getPageNumbers = () => {
+  const pageNumbers = useMemo(() => {
     const pages = [];
     const maxVisiblePages = 5;
 
@@ -226,7 +386,7 @@ const Shop = () => {
     }
 
     return pages;
-  };
+  }, [totalPages, currentPage]);
 
   const SkeletonCard = () => (
     <div className="mb-5">
@@ -234,7 +394,12 @@ const Shop = () => {
         <div
           style={{
             width: "100%",
-            height: 180,
+            height:
+              gridView === "grid-2"
+                ? "400px"
+                : gridView === "grid-3"
+                  ? "350px"
+                  : "300px",
             borderRadius: 12,
             background:
               "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%)",
@@ -282,23 +447,61 @@ const Shop = () => {
     </div>
   );
 
-  const chunkArray = (array, size) => {
-    const chunks = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-  };
-
   return (
     <>
-      {/* minimal CSS for skeleton shimmer */}
-      <style>{`
-        @keyframes shine {
-          0% { background-position: 100% 0; }
-          100% { background-position: 0 0; }
-        }
-      `}</style>
+      <Helmet>
+        {/* Basic SEO */}
+        <title>Shop | Adroit Alarm Systems</title>
+        <meta
+          name="description"
+          content="ADROIT is a premier Australian security company specializing in Electronic Security, Home Automation, Audio Visual, Data Cabling, and Ducted Vacuum systems. ASIAL accredited with 20+ years of experience delivering integrated, hassle-free solutions."
+        />
+        <meta
+          name="keywords"
+          content="ADROIT, Adroit Alarm System, security companies Australia, electronic security Sydney, home automation Australia, audio visual installation, data cabling contractors, ducted vacuum systems, ASIAL Silver Member, security license holders, integrated security solutions, Dynalite certified, commercial security, residential automation, access control, CCTV installation Australia"
+        />
+        <meta name="author" content="ADROIT Alarm Systems Australia" />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://shop.adroitalarm.com.au/" />
+
+        {/* Open Graph */}
+        <meta
+          property="og:title"
+          content="ADROIT Alarm Systems | Electronic Security & Automation Experts"
+        />
+        <meta
+          property="og:description"
+          content="Since 2008, ADROIT has delivered premium integrated solutions including security, automation, and AV. Fully licensed (Master License No: 000101930) and ASIAL accredited."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://shop.adroitalarm.com.au/" />
+        <meta property="og:site_name" content="ADROIT Alarm Systems" />
+
+        {/* Social Links */}
+        <meta
+          property="og:see_also"
+          content="https://www.instagram.com/adroitalarm/"
+        />
+        <meta
+          property="og:see_also"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Facebook  */}
+        <meta property="fb:app_id" content="#" />
+        <meta
+          property="fb:admins"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Instagram */}
+        <meta name="instagram:title" content="ADROIT Alarm Systems Australia" />
+        <meta
+          name="instagram:description"
+          content="Integrated solutions in electronic security, automation, audio visual and data cabling. Trusted Australian security specialists since 2008."
+        />
+        <meta name="instagram:site" content="@adroitalarm" />
+      </Helmet>
 
       <section>
         <PageHeader title="Shop" path="Home / Shop" />
@@ -306,219 +509,416 @@ const Shop = () => {
         <div className="container py-5">
           <PageBanner src={Banner} alt="Home Page Banner" />
 
-          {/* Filter panel */}
+          {/* Filter panel controls */}
           <div className="bg-light p-2 border mt-3 d-flex flex-column flex-md-row justify-content-md-between align-items-md-center gap-3">
-            <div className="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-2 w-100">
-              <button
-                className="btn border bg-white text-secondary rounded-0 w-100 w-md-auto d-flex align-items-center justify-content-center gap-2"
-                onClick={() => setIsOpen(!isOpen)}
-              >
-                {isOpen ? (
-                  <>
-                    <i className="bi bi-x"></i> Close Filter Panel
-                  </>
-                ) : (
-                  <>
-                    <i className="bi bi-funnel"></i> Filter Panel
-                  </>
-                )}
-              </button>
-
-              <select
-                className="form-select text-secondary border bg-white rounded-0 w-100 w-md-auto"
-                value={sortOrder}
-                onChange={(e) => {
-                  setSortOrder(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option>Ascending Order</option>
-                <option>Descending Order</option>
-                <option>Low - High Price</option>
-                <option>High - Low Price</option>
-              </select>
-
-              <select
-                className="form-select text-secondary border bg-white rounded-0 w-100 w-md-auto"
-                value={itemsPerPage}
-                onChange={(e) => {
-                  setItemsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="12">12 Products</option>
-                <option value="24">24 Products</option>
-                <option value="36">36 Products</option>
-                <option value="48">48 Products</option>
-              </select>
-
-              {/* Search box moved INSIDE here so it stacks below on mobile */}
-              <div className="input-group w-100 mt-2 mt-md-0">
-                <input
-                  type="text"
-                  className="form-control rounded-0"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                />
-                <button className="btn btn-light border rounded-0">
-                  <i className="bi bi-search"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Grid View Selector */}
-          <div className="d-none d-md-flex justify-content-start align-items-center mt-2">
-            <div
-              className="btn-group bg-light border p-2 rounded-0"
-              role="group"
-            >
-              <button
-                type="button"
-                className={`btn bg-white border rounded-0 ${
-                  gridView === "grid-2" ? "active" : ""
-                }`}
-                onClick={() => setGridView("grid-2")}
-                title="2 Columns"
-              >
-                <CgLayoutGrid size={20} />
-              </button>
-              <button
-                type="button"
-                className={`btn bg-white border rounded-0  ${
-                  gridView === "grid-3" ? "active" : ""
-                }`}
-                onClick={() => setGridView("grid-3")}
-                title="3 Columns"
-              >
-                <TfiLayoutGrid3Alt />
-              </button>
-              <button
-                type="button"
-                className={`btn bg-white border rounded-0  ${
-                  gridView === "grid-4" ? "active" : ""
-                }`}
-                onClick={() => setGridView("grid-4")}
-                title="4 Columns"
-              >
-                <TfiLayoutGrid4Alt size={25} />
-              </button>
-            </div>
-          </div>
-
-          <div
-            className={`border bg-white mt-2 p-3 ${
-              isOpen ? "d-block" : "d-none"
-            }`}
-          >
-            <div className="row">
-              <h6 className="fw-bold heading">Categories</h6>
-              {Array.isArray(categories) &&
-                chunkArray(categories, 8).map((categoryGroup, colIndex) => (
-                  <div className="col-md-3" key={colIndex}>
-                    {categoryGroup.map((category) => (
-                      <div
-                        key={category.category_id}
-                        className="form-check collection-filter-checkbox"
-                      >
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          id={category.categoryname}
-                          checked={selectedCategories.includes(
-                            category.category_id
-                          )}
-                          onChange={() =>
-                            handleCategorySelection(category.category_id)
-                          }
-                        />
-                        <label
-                          className="form-check-label"
-                          htmlFor={category.categoryname}
-                        >
-                          {category.categoryname}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-
-              <div className="col-md-3 mt-3 mt-md-0">
-                <h6 className="fw-bold heading">Brand</h6>
-                {[
-                  "Couture Edge",
-                  "Glamour Gaze",
-                  "Urban Chic",
-                  "VogueVista",
-                  "Velocity Vibe",
-                ].map((brand, index) => (
-                  <div key={index} className="form-check">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id={brand}
-                    />
-                    <label className="form-check-label" htmlFor={brand}>
-                      {brand}
-                    </label>
-                  </div>
-                ))}
-              </div>
-
-              <div className="col-md-3 mt-3 mt-md-0">
-                <h6 className="fw-bold heading">Rating</h6>
-                {[5, 4, 3, 2, 1].map((star, index) => (
-                  <div
-                    key={index}
-                    className="form-check d-flex align-items-center"
-                  >
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id={`star-${star}`}
-                    />
-                    <label
-                      className="form-check-label ms-2"
-                      htmlFor={`star-${star}`}
-                    >
-                      {"★".repeat(star)}
-                      {"☆".repeat(5 - star)} ({star} Star)
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="row pt-5">
-            {loading ? (
-              // Show skeleton placeholders while fetching
-              Array.from({ length: itemsPerPage }).map((_, i) => (
-                <div key={`sk-${i}`} className={`${getGridClasses()} mb-5`}>
-                  <SkeletonCard />
-                </div>
-              ))
-            ) : paginatedProducts.length > 0 ? (
-              paginatedProducts.map((product) => (
-                <div
-                  key={
-                    product.id ??
-                    product.product_id ??
-                    product.slug ??
-                    Math.random()
-                  }
-                  className={`${getGridClasses()} mb-5`}
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-5 w-100">
+              <div className="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-2 w-100 w-md-auto">
+                <button
+                  className="btn border bg-white text-secondary rounded-0 w-100 w-md-auto d-flex align-items-center justify-content-center gap-2"
+                  onClick={() => setIsOpen(!isOpen)}
                 >
-                  <ProductCard product={product} />
+                  {isOpen ? (
+                    <>
+                      <i className="bi bi-x"></i> Close Filter Panel
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-funnel"></i> Filter Panel
+                    </>
+                  )}
+                </button>
+
+                {/* Custom Sort Order Dropdown */}
+                <div className="position-relative w-100 w-md-auto sort-dropdown">
+                  <button
+                    className="form-select custom-select bg-white rounded-0 w-100 text-start position-relative d-flex align-items-center justify-content-between"
+                    onClick={() => {
+                      setIsSortOpen(!isSortOpen);
+                      setIsItemsPerPageOpen(false);
+                    }}
+                    type="button"
+                  >
+                    <span>{sortOrder}</span>
+                    <span
+                      className={`filter-arrow ms-2 d-flex align-items-center justify-content-center ${isSortOpen ? "rotate-180" : ""}`}
+                    >
+                      <FaChevronDown size={12} />
+                    </span>
+                  </button>
+                  {isSortOpen && (
+                    <div className="custom-select-dropdown position-absolute start-0 end-0 bg-white">
+                      {[
+                        "Ascending Order",
+                        "Descending Order",
+                        "Low - High Price",
+                        "High - Low Price",
+                      ].map((option) => (
+                        <div
+                          key={option}
+                          className={`custom-select-option ${sortOrder === option ? "selected" : ""}`}
+                          onClick={() => {
+                            setSortOrder(option);
+                            setCurrentPage(1);
+                            setIsSortOpen(false);
+                          }}
+                        >
+                          {option}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))
-            ) : (
-              <p className="text-muted text-center">No products available</p>
+
+                {/* Custom Items Per Page Dropdown */}
+                <div className="position-relative w-100 w-md-auto items-dropdown">
+                  <button
+                    className="form-select custom-select bg-white rounded-0 w-100 text-start position-relative d-flex align-items-center justify-content-between"
+                    onClick={() => {
+                      setIsItemsPerPageOpen(!isItemsPerPageOpen);
+                      setIsSortOpen(false);
+                    }}
+                    type="button"
+                  >
+                    <span>{itemsPerPage} Products</span>
+                    <span
+                      className={`filter-arrow ms-2 d-flex align-items-center justify-content-center ${isItemsPerPageOpen ? "rotate-180" : ""}`}
+                    >
+                      <FaChevronDown size={12} />
+                    </span>
+                  </button>
+                  {isItemsPerPageOpen && (
+                    <div className="custom-select-dropdown position-absolute start-0 end-0 bg-white">
+                      {[12, 24, 36, 48].map((option) => (
+                        <div
+                          key={option}
+                          className={`custom-select-option ${itemsPerPage === option ? "selected" : ""}`}
+                          onClick={() => {
+                            setItemsPerPage(option);
+                            setCurrentPage(1);
+                            setIsItemsPerPageOpen(false);
+                          }}
+                        >
+                          {option} Products
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-2 w-100 w-md-auto">
+                <div className="input-group w-100 w-md-auto">
+                  <input
+                    type="text"
+                    className="form-control rounded-0"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  />
+                  <button className="btn btn-light border rounded-0">
+                    <i className="bi bi-search"></i>
+                  </button>
+                </div>
+
+                {/* Grid View Selector */}
+                <div className="d-none d-md-flex align-items-center">
+                  <div className="btn-group p-0 rounded-0" role="group">
+                    <button
+                      type="button"
+                      className={`btn bg-white border rounded-0 ${
+                        gridView === "grid-2"
+                          ? "active text-primary"
+                          : "text-dark"
+                      }`}
+                      onClick={() => setGridView("grid-2")}
+                      title="2 Columns"
+                    >
+                      <CgLayoutGrid size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn bg-white border rounded-0 ${
+                        gridView === "grid-3"
+                          ? "active text-primary"
+                          : "text-dark"
+                      }`}
+                      onClick={() => setGridView("grid-3")}
+                      title="3 Columns"
+                    >
+                      <TfiLayoutGrid3Alt />
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn bg-white border rounded-0 ${
+                        gridView === "grid-4"
+                          ? "active text-primary"
+                          : "text-dark"
+                      }`}
+                      onClick={() => setGridView("grid-4")}
+                      title="4 Columns"
+                    >
+                      <TfiLayoutGrid4Alt size={25} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="position-relative mt-3">
+            {isOpen && (
+              <div
+                className="bg-light border p-3 position-absolute rounded-0 top-0 start-0 end-0"
+                style={{
+                  zIndex: 1050,
+                  boxShadow:
+                    "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
+                  maxHeight: "500px",
+                  overflowY: "auto",
+                }}
+              >
+                <div className="row g-3 mb-2 border-bottom pb-1">
+                  {/* Categories */}
+                  <div className="col-md-4">
+                    <div
+                      className="filter-section-header d-flex justify-content-between align-items-center py-2 mb-2"
+                      onClick={() => toggleSection("categories")}
+                    >
+                      <h6 className="fw-bold heading mb-0">Categories</h6>
+                      <span className="filter-arrow">
+                        {collapsedSections.categories ? (
+                          <FaChevronDown size={14} />
+                        ) : (
+                          <FaChevronUp size={14} />
+                        )}
+                      </span>
+                    </div>
+                    <div
+                      className={`panel-column filter-section-content p-1 ${
+                        collapsedSections.categories ? "collapsed" : ""
+                      }`}
+                    >
+                      {Array.isArray(categories) &&
+                        categories.map((category) => (
+                          <div
+                            key={category.category_id}
+                            className="form-check collection-filter-checkbox mb-1"
+                          >
+                            <input
+                              type="checkbox"
+                              className="form-check-input rounded-0"
+                              id={category.categoryname}
+                              checked={selectedCategories.includes(
+                                category.category_id,
+                              )}
+                              onChange={() =>
+                                handleCategorySelection(category.category_id)
+                              }
+                            />
+                            <label
+                              className="form-check-label"
+                              htmlFor={category.categoryname}
+                            >
+                              {category.categoryname}
+                            </label>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Ratings */}
+                  <div className="col-md-4">
+                    <div
+                      className="filter-section-header d-flex justify-content-between align-items-center py-2 mb-2"
+                      onClick={() => toggleSection("ratings")}
+                    >
+                      <h6 className="fw-bold heading mb-0">Rating</h6>
+                      <span className="filter-arrow">
+                        {collapsedSections.ratings ? (
+                          <FaChevronDown size={14} />
+                        ) : (
+                          <FaChevronUp size={14} />
+                        )}
+                      </span>
+                    </div>
+                    <div
+                      className={`panel-column filter-section-content p-1 ${
+                        collapsedSections.ratings ? "collapsed" : ""
+                      }`}
+                    >
+                      {[5, 4, 3, 2, 1].map((star, index) => (
+                        <div
+                          key={index}
+                          className="form-check d-flex align-items-center mb-2"
+                        >
+                          <input
+                            className="form-check-input rounded-0"
+                            type="checkbox"
+                            id={`star-${star}`}
+                            checked={selectedRatings.includes(star)}
+                            onChange={() => handleRatingSelection(star)}
+                          />
+                          <label
+                            className="form-check-label ms-2"
+                            htmlFor={`star-${star}`}
+                          >
+                            {"★".repeat(star)}
+                            {"☆".repeat(5 - star)} ({star} Star)
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Price Range */}
+                  <div className="col-md-4">
+                    <div
+                      className="filter-section-header d-flex justify-content-between align-items-center py-2 mb-2"
+                      onClick={() => toggleSection("priceRange")}
+                    >
+                      <h6 className="fw-bold heading mb-0">Filter By Price</h6>
+                      <span className="filter-arrow">
+                        {collapsedSections.priceRange ? (
+                          <FaChevronDown size={14} />
+                        ) : (
+                          <FaChevronUp size={14} />
+                        )}
+                      </span>
+                    </div>
+                    <div
+                      className={`panel-column filter-section-content price-section p-2 ${
+                        collapsedSections.priceRange ? "collapsed" : ""
+                      }`}
+                    >
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span className="small fw-bold">Price Range</span>
+                      </div>
+                      <p className="small mb-4">
+                        Your range:{" "}
+                        <strong>
+                          ${priceRange[0].toLocaleString()} - $
+                          {priceRange[1].toLocaleString()}
+                        </strong>
+                      </p>
+
+                      <div className="px-1">
+                        <Range
+                          step={10}
+                          min={50}
+                          max={5000}
+                          values={priceRange}
+                          onChange={handlePriceRangeChange}
+                          renderTrack={({ props, children }) => {
+                            const { key, ...restProps } = props;
+                            return (
+                              <div
+                                {...restProps}
+                                key={key}
+                                style={{
+                                  height: "2px",
+                                  width: "100%",
+                                  background: "rgba(0,0,0,0.3)",
+                                  position: "relative",
+                                  marginTop: "10px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    height: "2px",
+                                    background: "#0d6efd",
+                                    left: `${((priceRange[0] - 50) / (5000 - 50)) * 100}%`,
+                                    right: `${100 - ((priceRange[1] - 50) / (5000 - 50)) * 100}%`,
+                                  }}
+                                />
+                                {children}
+                              </div>
+                            );
+                          }}
+                          renderThumb={({ props }) => {
+                            const { key, ...restProps } = props;
+                            return (
+                              <div
+                                {...restProps}
+                                key={key}
+                                style={{
+                                  height: "14px",
+                                  width: "14px",
+                                  backgroundColor: "#0d6efd",
+                                  borderRadius: "50%",
+                                  marginTop: "-14px",
+                                  cursor: "pointer",
+                                  boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                                }}
+                              />
+                            );
+                          }}
+                        />
+
+                        <div className="d-flex justify-content-between mt-2">
+                          <span className="small">${50}</span>
+                          <span className="small">${5000}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reset All Filters Button */}
+                <div className="d-flex justify-content-end">
+                  <button
+                    className="btn btn-outline-secondary rounded-0 d-flex align-items-center gap-2"
+                    onClick={resetAllFilters}
+                  >
+                    <i className="bi bi-arrow-counterclockwise"></i>
+                    Reset All Filters
+                  </button>
+                </div>
+              </div>
             )}
+
+            {/* Products container */}
+            <div className="row pt-3">
+              {loading ? (
+                Array.from({ length: itemsPerPage }).map((_, i) => (
+                  <div key={`sk-${i}`} className={`${getGridClasses()} mb-5`}>
+                    <SkeletonCard />
+                  </div>
+                ))
+              ) : paginatedProducts.length > 0 ? (
+                paginatedProducts.map((product) => (
+                  <div
+                    key={
+                      product.id ??
+                      product.product_id ??
+                      product.slug ??
+                      `product-${Math.random()}`
+                    }
+                    className={`${getGridClasses()} mb-5`}
+                  >
+                    <ProductCard product={product} gridView={gridView} />
+                  </div>
+                ))
+              ) : (
+                <div className="col-12">
+                  <div className="text-center py-5">
+                    <p className="text-muted mb-3">No products available</p>
+                    <p className="text-muted small">
+                      Try adjusting your filters or price range
+                    </p>
+                    <button
+                      className="btn btn-outline-primary rounded-0 mt-2"
+                      onClick={resetAllFilters}
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {totalPages > 1 && (
@@ -536,22 +936,22 @@ const Shop = () => {
                   </button>
                 </li>
 
-                {getPageNumbers().map((page, index) => (
+                {pageNumbers.map((page, index) => (
                   <li
                     key={index}
                     className={`page-item ${
                       page === "..."
                         ? "disabled"
                         : currentPage === page
-                        ? "active"
-                        : ""
+                          ? "active"
+                          : ""
                     }`}
                   >
                     {page === "..." ? (
                       <span className="page-link">...</span>
                     ) : (
                       <button
-                        className={`page-link ${
+                        className={`page-link rounded-0 ${
                           currentPage === page
                             ? "bg-primary text-white border-primary"
                             : ""
@@ -565,9 +965,7 @@ const Shop = () => {
                 ))}
 
                 <li
-                  className={`page-item ${
-                    currentPage === totalPages ? "disabled" : ""
-                  }`}
+                  className={`page-item ${currentPage === totalPages ? "disabled" : ""}`}
                 >
                   <button
                     className="page-link rounded-0"

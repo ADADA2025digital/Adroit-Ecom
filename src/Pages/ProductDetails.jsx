@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Helmet } from "react-helmet-async";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import PageHeader from "../Components/PageHeader";
 import { fetchProducts } from "../Constants/Data";
@@ -7,7 +8,8 @@ import { useCart } from "../Components/CartContext";
 import { useCompare } from "../Components/CompareContext";
 import CompareModal from "../Components/CompareModal";
 import ProductCard from "../Components/ProductCard";
-import api from '../Config/api';
+import api from "../Config/api";
+import GlobalButton from "../Components/Button";
 
 const ProductDetails = () => {
   const { slugWithId } = useParams();
@@ -29,34 +31,39 @@ const ProductDetails = () => {
   const [showStickyBar, setShowStickyBar] = useState(false);
   const [reviewSummary, setReviewSummary] = useState(null);
   const [showRatingTooltip, setShowRatingTooltip] = useState(false);
+  const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
 
   // Load initial data from cache instantly
   useEffect(() => {
     const loadInitialData = () => {
       // Load cached products
-      const cachedProducts = JSON.parse(localStorage.getItem("cached_products") || "[]");
-      const cachedProductDetails = JSON.parse(localStorage.getItem(`cached_product_${id}`) || "null");
-      
+      const cachedProducts = JSON.parse(
+        localStorage.getItem("cached_products") || "[]",
+      );
+      const cachedProductDetails = JSON.parse(
+        localStorage.getItem(`cached_product_${id}`) || "null",
+      );
+
       // Try to find product from cached data
       let foundProduct = cachedProductDetails;
       if (!foundProduct) {
         foundProduct = cachedProducts.find((p) => String(p.id) === String(id));
       }
-      
+
       if (foundProduct) {
         setProduct(foundProduct);
-        
+
         // Set related products from cache
         if (foundProduct && foundProduct.category) {
           const related = cachedProducts.filter(
             (p) =>
               p.category &&
               p.category.id === foundProduct.category.id &&
-              p.id !== foundProduct.id
+              p.id !== foundProduct.id,
           );
           setRelatedProducts(related.slice(0, 8));
         }
-        
+
         // Set initial image
         if (foundProduct.images?.length > 0) {
           setSelectedImage(foundProduct.images[0].imgurl);
@@ -65,17 +72,25 @@ const ProductDetails = () => {
     };
 
     loadInitialData();
-    
+
     // Fetch fresh data in background
     loadProduct();
   }, [id]);
+
+  // Reset thumbnail start index when product changes
+  useEffect(() => {
+    setThumbnailStartIndex(0);
+    if (product?.images?.length > 0) {
+      setSelectedImage(product.images[0].imgurl);
+    }
+  }, [product?.id]);
 
   // Fetch product data and related products in background
   const loadProduct = async () => {
     try {
       const products = await fetchProducts();
       const found = products.find((p) => String(p.id) === String(id));
-      
+
       if (found) {
         setProduct(found);
         // Cache individual product
@@ -86,11 +101,11 @@ const ProductDetails = () => {
             (p) =>
               p.category &&
               p.category.id === found.category.id &&
-              p.id !== found.id
+              p.id !== found.id,
           );
           setRelatedProducts(related.slice(0, 8));
         }
-        
+
         // Set initial image
         if (found.images?.length > 0) {
           setSelectedImage(found.images[0].imgurl);
@@ -98,7 +113,7 @@ const ProductDetails = () => {
       }
     } catch (err) {
       // Keep cached data on error
-      console.error("Error loading product:", err);
+      // console.error("Error loading product:", err);
     }
   };
 
@@ -106,28 +121,32 @@ const ProductDetails = () => {
   useEffect(() => {
     const fetchReviewSummary = async () => {
       if (!product?.id) return;
-      
+
       try {
         // Use product_id if available, otherwise format the id
-        const productId = product.product_id || `PRO${String(product.id).padStart(3, '0')}`;
-        
+        const productId =
+          product.product_id || `PRO${String(product.id).padStart(3, "0")}`;
+
         // Check cache first
         const cachedReview = localStorage.getItem(`cached_review_${productId}`);
         if (cachedReview) {
           setReviewSummary(JSON.parse(cachedReview));
         }
-        
+
         const response = await api.get(`/products/${productId}/review-summary`);
-        
+
         if (response.data.success) {
           setReviewSummary(response.data.summary);
           // Cache review data
-          localStorage.setItem(`cached_review_${productId}`, JSON.stringify(response.data.summary));
+          localStorage.setItem(
+            `cached_review_${productId}`,
+            JSON.stringify(response.data.summary),
+          );
         } else {
           setReviewSummary(null);
         }
       } catch (error) {
-        console.error("Error fetching review summary:", error);
+        // console.error("Error fetching review summary:", error);
         // Keep cached review data on error
       }
     };
@@ -139,16 +158,20 @@ const ProductDetails = () => {
 
   // Intersection Observer for sticky bar
   useEffect(() => {
-    if (!relatedRef.current) return;
+    const el = relatedRef.current;
+    if (!el) return;
 
     const observer = new IntersectionObserver(
-      ([entry]) => setShowStickyBar(entry.isIntersecting),
-      { root: null, threshold: 0.1 }
+      ([entry]) => {
+        // Show sticky when Related section is NOT visible
+        setShowStickyBar(!entry.isIntersecting);
+      },
+      { threshold: 0.1 },
     );
 
-    observer.observe(relatedRef.current);
+    observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [product]);
 
   // Helper function to render star rating
   const renderStarRating = (averageRating) => {
@@ -163,7 +186,7 @@ const ProductDetails = () => {
         </>
       );
     }
-  
+
     const stars = [];
     const fullStars = Math.floor(averageRating);
     const hasHalfStar = averageRating % 1 >= 0.5;
@@ -171,15 +194,27 @@ const ProductDetails = () => {
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
         stars.push(
-          <i key={i} className="bi bi-star-fill text-warning" title={`${averageRating} average rating`}></i>
+          <i
+            key={i}
+            className="bi bi-star-fill text-warning"
+            title={`${averageRating} average rating`}
+          ></i>,
         );
       } else if (i === fullStars && hasHalfStar) {
         stars.push(
-          <i key={i} className="bi bi-star-half text-warning" title={`${averageRating} average rating`}></i>
+          <i
+            key={i}
+            className="bi bi-star-half text-warning"
+            title={`${averageRating} average rating`}
+          ></i>,
         );
       } else {
         stars.push(
-          <i key={i} className="bi bi-star text-warning" title={`${averageRating} average rating`}></i>
+          <i
+            key={i}
+            className="bi bi-star text-warning"
+            title={`${averageRating} average rating`}
+          ></i>,
         );
       }
     }
@@ -188,9 +223,9 @@ const ProductDetails = () => {
 
   // Scroll to reviews section
   const scrollToReviews = () => {
-    const reviewsSection = document.querySelector('.reviews-section');
+    const reviewsSection = document.querySelector(".reviews-section");
     if (reviewsSection) {
-      reviewsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      reviewsSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
@@ -201,7 +236,7 @@ const ProductDetails = () => {
     try {
       await addToCart(product, quantity, size);
     } catch (error) {
-      console.error("Failed to add to cart:", error);
+      // console.error("Failed to add to cart:", error);
     } finally {
       setAddingToCart(false);
     }
@@ -211,21 +246,22 @@ const ProductDetails = () => {
     if (!product) return;
 
     setAddingToCart(true);
-    try {   
+    try {
       // Resolve backend product_id via API using slug
       let backendProductId = product.product_id || null;
       try {
         const slug = (slugWithId || "").slice(
           0,
-          (slugWithId || "").lastIndexOf("-")
+          (slugWithId || "").lastIndexOf("-"),
         );
         if (slug) {
           const response = await api.get(`/products/${slug}`);
-          const p = response.data?.product || response.data?.data || response.data;
+          const p =
+            response.data?.product || response.data?.data || response.data;
           backendProductId = p?.product_id || backendProductId;
         }
       } catch (error) {
-        console.error("Error fetching product details:", error);
+        // console.error("Error fetching product details:", error);
       }
 
       const buyNowItem = {
@@ -242,7 +278,7 @@ const ProductDetails = () => {
 
       navigate("/checkout", { state: { buyNow: true } });
     } catch (error) {
-      console.error("Buy Now failed:", error);
+      // console.error("Buy Now failed:", error);
       alert("Failed to process Buy Now. Please try again.");
     } finally {
       setAddingToCart(false);
@@ -254,7 +290,7 @@ const ProductDetails = () => {
     addToCompare(product);
 
     const compareModal = new window.bootstrap.Modal(
-      document.getElementById("compareModal")
+      document.getElementById("compareModal"),
     );
     compareModal.show();
   };
@@ -263,6 +299,20 @@ const ProductDetails = () => {
     if (!path) return null;
     if (path.startsWith("http://") || path.startsWith("https://")) return path;
     return `https://shop.adroitalarm.com.au/${path.replace(/^\/+/, "")}`;
+  };
+
+  const nextThumbnails = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!product?.images) return;
+    const maxStartIndex = Math.max(0, product.images.length - 3);
+    setThumbnailStartIndex((prev) => Math.min(prev + 1, maxStartIndex));
+  };
+
+  const prevThumbnails = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setThumbnailStartIndex((prev) => Math.max(prev - 1, 0));
   };
 
   const nextSlide = () => {
@@ -298,22 +348,72 @@ const ProductDetails = () => {
   }
 
   const images = product.images || [];
-  
-  // CHANGED: Group images in sets of 3 instead of 2
-  const groupedImages = [];
-  for (let i = 0; i < images.length; i += 3) {
-    groupedImages.push(images.slice(i, i + 3));
-  }
-
+  const maxThumbnailStartIndex = Math.max(0, images.length - 3);
   const itemsPerSlide = 4;
   const startIndex = currentSlide * itemsPerSlide;
   const visibleProducts = relatedProducts.slice(
     startIndex,
-    startIndex + itemsPerSlide
+    startIndex + itemsPerSlide,
   );
 
   return (
     <>
+      <Helmet>
+        {/* Basic SEO */}
+        <title>
+          {product.productname} | Adroit Alarm Systems 
+        </title>
+        <meta
+          name="description"
+          content="ADROIT is a premier Australian security company specializing in Electronic Security, Home Automation, Audio Visual, Data Cabling, and Ducted Vacuum systems. ASIAL accredited with 20+ years of experience delivering integrated, hassle-free solutions."
+        />
+        <meta
+          name="keywords"
+          content="ADROIT, Adroit Alarm System, security companies Australia, electronic security Sydney, home automation Australia, audio visual installation, data cabling contractors, ducted vacuum systems, ASIAL Silver Member, security license holders, integrated security solutions, Dynalite certified, commercial security, residential automation, access control, CCTV installation Australia"
+        />
+        <meta name="author" content="ADROIT Alarm Systems Australia" />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://shop.adroitalarm.com.au/" />
+
+        {/* Open Graph */}
+        <meta
+          property="og:title"
+          content="ADROIT Alarm Systems | Electronic Security & Automation Experts"
+        />
+        <meta
+          property="og:description"
+          content="Since 2008, ADROIT has delivered premium integrated solutions including security, automation, and AV. Fully licensed (Master License No: 000101930) and ASIAL accredited."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://shop.adroitalarm.com.au/" />
+        <meta property="og:site_name" content="ADROIT Alarm Systems" />
+
+        {/* Social Links */}
+        <meta
+          property="og:see_also"
+          content="https://www.instagram.com/adroitalarm/"
+        />
+        <meta
+          property="og:see_also"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Facebook  */}
+        <meta property="fb:app_id" content="#" />
+        <meta
+          property="fb:admins"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Instagram */}
+        <meta name="instagram:title" content="ADROIT Alarm Systems Australia" />
+        <meta
+          name="instagram:description"
+          content="Integrated solutions in electronic security, automation, audio visual and data cabling. Trusted Australian security specialists since 2008."
+        />
+        <meta name="instagram:site" content="@adroitalarm" />
+      </Helmet>
+
       <div className="container-fluid p-0">
         <PageHeader
           title={product.productname}
@@ -330,114 +430,130 @@ const ProductDetails = () => {
                   src={getImagePath(selectedImage)}
                   alt={product.productname}
                   className="img-fluid mb-3 modal-product-image object-fit-cover border"
-                  style={{ height: "350px" }}
+                  style={{ height: "350px", width: "auto", maxWidth: "100%" }}
+                  onError={(e) => {
+                    e.currentTarget.src =
+                      "https://via.placeholder.com/350x350?text=No+Image";
+                  }}
                 />
               </div>
 
-              <div className="row my-4 d-flex justify-content-center">
-                {/* Thumbnail Carousel */}
-                <div
-                  id="imageCarousel"
-                  className="carousel slide w-100"
-                  data-bs-interval="false"
-                >
-                  <div className="carousel-inner">
-                    {groupedImages.map((group, index) => (
-                      <div
-                        key={index}
-                        className={`carousel-item ${
-                          index === 0 ? "active" : ""
-                        }`}
-                      >
-                        <div className="d-flex justify-content-center gap-3 flex-wrap">
-                          {group.map((img, idx) => {
-                            const imagePath = img.imgurl;
-                            return (
-                              <img
-                                key={idx}
-                                src={getImagePath(imagePath)}
-                                alt={`Thumbnail ${idx + 1}`}
-                                className="img-thumbnail rounded-0"
-                                style={{
-                                  width: "100px",
-                                  height: "100px",
-                                  objectFit: "cover",
-                                  cursor: "pointer",
-                                  border:
-                                    imagePath === selectedImage
-                                      ? "2px solid #0d6efd"
-                                      : "1px solid #dee2e6",
-                                }}
-                                onClick={() => setSelectedImage(imagePath)}
-                              />
-                            );
-                          })}
-                          
-                          {/* CHANGED: Add empty placeholders if needed to maintain consistent layout */}
-                          {group.length < 3 && 
-                            Array.from({ length: 3 - group.length }).map((_, emptyIdx) => (
-                              <div 
-                                key={`empty-${emptyIdx}`}
-                                className="img-thumbnail rounded-0"
-                                style={{
-                                  width: "100px",
-                                  height: "100px",
-                                  backgroundColor: "#f8f9fa",
-                                  border: "1px solid #dee2e6",
-                                  opacity: 0.5
-                                }}
-                              ></div>
-                            ))
-                          }
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {/* Thumbnail Carousel - Shows 3 images, navigates one at a time */}
+              {images.length > 0 && (
+                <div className="row my-4 d-flex justify-content-center">
+                  <div className="position-relative w-100 px-5">
+                    <div className="d-flex justify-content-center align-items-center gap-3">
+                      {/* Previous button - only show if not at start */}
+                      {thumbnailStartIndex > 0 && (
+                        <button
+                          className="btn btn-sm btn-outline-secondary rounded-circle position-absolute start-0 z-3"
+                          onClick={prevThumbnails}
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            padding: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transform: "translateX(100%)",
+                          }}
+                          aria-label="Previous thumbnails"
+                        >
+                          <i className="bi bi-chevron-left"></i>
+                        </button>
+                      )}
 
-                  {groupedImages.length > 1 && (
-                    <>
-                      <button
-                        className="carousel-control-prev bg-secondary text-dark rounded-circle"
-                        type="button"
-                        data-bs-target="#imageCarousel"
-                        data-bs-slide="prev"
-                        style={{
-                          width: "40px",
-                          height: "40px",
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          left: "20px",
-                        }}
-                      >
-                        <span className="carousel-control-prev-icon" />
-                        <span className="visually-hidden">Previous</span>
-                      </button>
-                      <button
-                        className="carousel-control-next bg-secondary text-dark rounded-circle"
-                        type="button"
-                        data-bs-target="#imageCarousel"
-                        data-bs-slide="next"
-                        style={{
-                          width: "40px",
-                          height: "40px",
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          right: "20px",
-                        }}
-                      >
-                        <span className="carousel-control-next-icon" />
-                        <span className="visually-hidden">Next</span>
-                      </button>
-                    </>
-                  )}
+                      {/* Display actual thumbnails only */}
+                      {images
+                        .slice(thumbnailStartIndex, thumbnailStartIndex + 3)
+                        .map((img, idx) => {
+                          const imagePath = img.imgurl;
+                          return (
+                            <img
+                              key={thumbnailStartIndex + idx}
+                              src={getImagePath(imagePath)}
+                              alt={`Thumbnail ${thumbnailStartIndex + idx + 1}`}
+                              className="img-thumbnail rounded-0"
+                              style={{
+                                width: "100px",
+                                height: "100px",
+                                objectFit: "cover",
+                                cursor: "pointer",
+                                border:
+                                  selectedImage === imagePath
+                                    ? "3px solid #0d6efd"
+                                    : "1px solid #dee2e6",
+                                transition: "all 0.2s ease",
+                                opacity: selectedImage === imagePath ? 1 : 0.7,
+                              }}
+                              onClick={() => setSelectedImage(imagePath)}
+                              onMouseEnter={(e) => {
+                                if (selectedImage !== imagePath) {
+                                  e.currentTarget.style.opacity = "0.9";
+                                  e.currentTarget.style.borderColor = "#0d6efd";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (selectedImage !== imagePath) {
+                                  e.currentTarget.style.opacity = "0.7";
+                                  e.currentTarget.style.borderColor = "#dee2e6";
+                                }
+                              }}
+                            />
+                          );
+                        })}
+
+                      {/* Next button - only show if more images available */}
+                      {thumbnailStartIndex < maxThumbnailStartIndex && (
+                        <button
+                          className="btn btn-sm btn-outline-secondary rounded-circle position-absolute end-0 z-3"
+                          onClick={nextThumbnails}
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            padding: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transform: "translateX(-100%)",
+                          }}
+                          aria-label="Next thumbnails"
+                        >
+                          <i className="bi bi-chevron-right"></i>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Image counter */}
+                    {images.length > 3 && (
+                      <div className="text-center mt-3 small text-muted">
+                        {thumbnailStartIndex + 1} -{" "}
+                        {Math.min(thumbnailStartIndex + 3, images.length)} of{" "}
+                        {images.length} images
+                      </div>
+                    )}
+
+                    {/* Show total images count when less than 3 */}
+                    {images.length <= 3 && images.length > 0 && (
+                      <div className="text-center mt-3 small text-muted">
+                        1 - {images.length} of {images.length} images
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Fallback if no images */}
+              {images.length === 0 && (
+                <div className="row my-4">
+                  <div className="col-12 text-center text-muted">
+                    <p>No additional images available</p>
+                  </div>
+                </div>
+              )}
 
               <div className="reviews-section">
-                <Details 
-                  product={product} 
-                  reviewSummary={reviewSummary}
-                />
+                <Details product={product} reviewSummary={reviewSummary} />
               </div>
             </div>
 
@@ -448,7 +564,7 @@ const ProductDetails = () => {
                   <h2 className="py-2 heading">{product.productname}</h2>
 
                   {/* Enhanced Review Section with API Data */}
-                  <div 
+                  <div
                     className="d-flex align-items-center mb-3 flex-wrap gap-2 position-relative"
                     onMouseEnter={() => setShowRatingTooltip(true)}
                     onMouseLeave={() => setShowRatingTooltip(false)}
@@ -456,26 +572,29 @@ const ProductDetails = () => {
                     {reviewSummary && reviewSummary.total_ratings > 0 ? (
                       <>
                         {/* Clickable Rating */}
-                        <button 
+                        <button
                           className="d-flex align-items-center border-end pe-2 bg-transparent border-0"
                           onClick={scrollToReviews}
-                          style={{ cursor: 'pointer' }}
+                          style={{ cursor: "pointer" }}
                           title="Click to view all reviews"
                         >
                           {renderStarRating(reviewSummary.average_rating)}
                           <span className="ms-2 fw-bold text-dark">
-                            {reviewSummary.average_rating?.toFixed(1) || '0.0'}
+                            {reviewSummary.average_rating?.toFixed(1) || "0.0"}
                           </span>
                         </button>
-                        
+
                         {/* Reviews count */}
-                        <button 
+                        <button
                           className="text-muted small bg-transparent border-0 p-0"
                           onClick={scrollToReviews}
-                          style={{ cursor: 'pointer' }}
+                          style={{ cursor: "pointer" }}
                           title="Click to view all reviews"
                         >
-                          {reviewSummary.total_ratings} {reviewSummary.total_ratings === 1 ? 'Review' : 'Reviews'}
+                          {reviewSummary.total_ratings}{" "}
+                          {reviewSummary.total_ratings === 1
+                            ? "Review"
+                            : "Reviews"}
                         </button>
                       </>
                     ) : reviewSummary && reviewSummary.total_ratings === 0 ? (
@@ -485,12 +604,12 @@ const ProductDetails = () => {
                           <span className="ms-2 fw-bold text-dark">0.0</span>
                         </div>
                         <span className="text-muted small">No reviews yet</span>
-                        <button 
-                          className="btn btn-outline-primary btn-sm ms-2"
+                        <GlobalButton
                           onClick={scrollToReviews}
+                          className="btn-outline-primary btn-sm ms-2"
                         >
                           Be the first to review
-                        </button>
+                        </GlobalButton>
                       </>
                     ) : (
                       <>
@@ -521,8 +640,8 @@ const ProductDetails = () => {
                       {product.stock > 5
                         ? "In stock"
                         : product.stock > 0
-                        ? `Only ${product.stock} left!`
-                        : "Out of stock"}
+                          ? `Only ${product.stock} left!`
+                          : "Out of stock"}
                     </span>
                   </div>
 
@@ -580,10 +699,10 @@ const ProductDetails = () => {
                       <i className="bi bi-plus text-black fs-5"></i>
                     </button>
                   </div>
-                  <button
-                    className="button px-4 py-2 d-flex align-items-center justify-content-center text-white fw-semibold"
+                  <GlobalButton
                     onClick={handleAddToCart}
                     disabled={addingToCart || cartLoading}
+                    className={addingToCart || cartLoading ? "pe-none" : ""}
                   >
                     {addingToCart ? (
                       <>
@@ -599,11 +718,12 @@ const ProductDetails = () => {
                         <i className="bi bi-cart me-2"></i> Add To Cart
                       </>
                     )}
-                  </button>
-                  <button
+                  </GlobalButton>
+
+                  <GlobalButton
                     onClick={handleBuyNow}
-                    className="button px-4 py-2 d-flex align-items-center justify-content-center text-white fw-semibold"
                     disabled={addingToCart || cartLoading}
+                    className={addingToCart || cartLoading ? "pe-none" : ""}
                   >
                     {addingToCart ? (
                       <>
@@ -619,7 +739,7 @@ const ProductDetails = () => {
                         <i className="bi bi-cash-coin me-2"></i> Buy Now
                       </>
                     )}
-                  </button>
+                  </GlobalButton>
                   <button
                     className="btn btn-outline-secondary rounded-0"
                     onClick={handleAddToCompare}
@@ -722,7 +842,7 @@ const ProductDetails = () => {
             right: 0,
             zIndex: 1000,
             boxShadow: "0 -2px 10px rgba(0,0,0,0.1)",
-            transform: showStickyBar ? "translateY(0%)" : "translateY(100%)",
+            transform: showStickyBar ? "translateY(100%)" : "translateY(0%)",
             transition: "transform 0.3s ease-in-out",
           }}
         >
@@ -749,7 +869,7 @@ const ProductDetails = () => {
               <div className="d-flex align-items-center gap-2 flex-wrap">
                 <button
                   className="btn btn-outline-secondary rounded-0"
-                    onClick={handleAddToCompare}
+                  onClick={handleAddToCompare}
                   aria-label="Add to compare"
                 >
                   <i className="bi bi-repeat px-1"></i>
@@ -775,6 +895,7 @@ const ProductDetails = () => {
                   className="button px-3 py-2 d-flex align-items-center justify-content-center text-white fw-semibold"
                   onClick={handleAddToCart}
                   disabled={addingToCart || cartLoading}
+                  style={{ backgroundColor: "#0d6efd", border: "none" }}
                 >
                   {addingToCart ? (
                     <>

@@ -36,7 +36,7 @@ const Details = ({ product, reviewSummary: externalReviewSummary, loadingReviews
             throw new Error("Failed to fetch review summary");
           }
         } catch (error) {
-          console.error("Error fetching review summary:", error);
+          // console.error("Error fetching review summary:", error);
           setInternalReviewSummary({
             average_rating: 0,
             total_ratings: 0,
@@ -60,7 +60,7 @@ const Details = ({ product, reviewSummary: externalReviewSummary, loadingReviews
             createPlaceholderReviews();
           }
         } catch (error) {
-          console.error("Error fetching detailed reviews:", error);
+          // console.error("Error fetching detailed reviews:", error);
           createPlaceholderReviews();
         }
       };

@@ -48,7 +48,7 @@ const ApprovedReviewsTab = ({ user, formatDate, onRefresh }) => {
         throw new Error(response.data.message || "Failed to fetch reviews");
       }
     } catch (err) {
-      console.error("Reviews fetch error:", err);
+      // console.error("Reviews fetch error:", err);
       
       if (err.response?.status === 401) {
         setError("Authentication failed. Please log in again.");

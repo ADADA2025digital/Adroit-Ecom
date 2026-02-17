@@ -7,13 +7,6 @@ import axios from "axios";
 import GlobalButton from "./Button";
 
 const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
-  console.log("🔹 CheckoutCardSection rendered with props:", {
-    title,
-    options,
-    selectedOption,
-    onSelect
-  });
-
   const [formData, setFormData] = useState({
     address: "",
     postcode: "",
@@ -25,20 +18,8 @@ const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
   const [selectedAddressType, setSelectedAddressType] = useState(null);
   const [savedAddresses, setSavedAddresses] = useState([]);
 
-  console.log("🔹 Current state:", {
-    formData,
-    selectedAddressType,
-    savedAddressesCount: savedAddresses.length,
-    savedAddresses
-  });
-
   const handleInputChange = (e) => {
     const { id, value } = e.target;
-    console.log(`🔹 Input changed: ${id} = ${value}`, {
-      previousValue: formData[id],
-      newValue: value,
-      eventType: e.type
-    });
     
     setFormData((prev) => ({
       ...prev,
@@ -54,72 +35,53 @@ const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
     })),
   ];
 
-  console.log("🔹 Address type options:", addressTypeOptions);
 
   useEffect(() => {
-    console.log("🔹 useEffect triggered - fetching addresses");
     const fetchSavedAddresses = async () => {
       try {
-        console.log("🟡 Starting API call to /api/address");
         const response = await axios.get("/api/address");
-        console.log("🟢 API Response:", response.data);
         
         if (response.data.status === 200) {
-          console.log("✅ Addresses fetched successfully:", response.data.data);
           setSavedAddresses(response.data.data);
         } else {
-          console.error("❌ Failed to fetch addresses:", response.data.message);
+          // console.error("Failed to fetch addresses:", response.data.message);
         }
       } catch (error) {
-        console.error("❌ Error fetching addresses:", {
-          error,
-          message: error.message,
-          response: error.response?.data
-        });
+        // console.error("Error fetching addresses:", {
+        //   error,
+        //   message: error.message,
+        //   response: error.response?.data
+        // });
       }
     };
 
     fetchSavedAddresses();
   }, []);
 
-  const saveAddress = async () => {
-    console.log("🔹 saveAddress called with formData:", formData);
-    
+  const saveAddress = async () => {    
     // Validation
     if (!formData.address.trim()) {
-      console.error("❌ Validation failed: Address is required");
+      // console.error("Validation failed: Address is required");
       alert("Please enter an address");
       return;
     }
     
     if (!formData.state) {
-      console.error("❌ Validation failed: State is required");
       alert("Please select a state");
       return;
     }
     
     if (!formData.city) {
-      console.error("❌ Validation failed: City is required");
       alert("Please select a city");
       return;
     }
     
     if (!formData.postcode.trim()) {
-      console.error("❌ Validation failed: Postcode is required");
       alert("Please enter a postcode");
       return;
     }
 
     try {
-      console.log("🟡 Starting API call to /api/storeAddress with data:", {
-        address: formData.address,
-        suburb: formData.city,
-        postcode: formData.postcode,
-        state: formData.state,
-        country: formData.country,
-        address_type: "delivery",
-      });
-
       const response = await axios.post("/api/storeAddress", {
         address: formData.address,
         suburb: formData.city,
@@ -129,16 +91,11 @@ const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
         address_type: "delivery",
       });
 
-      console.log("🟢 Store Address API Response:", response.data);
 
       if (response.data.status === 200) {
-        console.log("✅ Address saved successfully!");
         alert("Address saved successfully!");
 
-        // Refresh saved addresses
-        console.log("🟡 Refreshing addresses list...");
         const addressesResponse = await axios.get("/api/address");
-        console.log("🟢 Refresh addresses response:", addressesResponse.data);
         
         if (addressesResponse.data.status === 200) {
           setSavedAddresses(addressesResponse.data.data);
@@ -147,20 +104,17 @@ const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
           const newlyAddedAddress = addressesResponse.data.data.find(
             (addr) => addr.address === formData.address
           );
-          console.log("🔹 Newly added address:", newlyAddedAddress);
           
           if (newlyAddedAddress) {
             setSelectedAddressType({
               value: newlyAddedAddress.id,
               label: newlyAddedAddress.address,
             });
-            console.log("🔹 Auto-selecting new address:", newlyAddedAddress.id);
             onSelect(newlyAddedAddress.id);
           }
         }
 
         // Clear the form data
-        console.log("🔹 Clearing form data");
         setFormData({
           address: "",
           postcode: "",
@@ -169,32 +123,29 @@ const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
           city: "",
         });
       } else {
-        console.error("❌ API returned error:", response.data.message);
+        // console.error("API returned error:", response.data.message);
         alert(response.data.message || "Failed to save the address.");
       }
     } catch (error) {
-      console.error("❌ Error saving address:", {
-        error,
-        message: error.message,
-        response: error.response?.data,
-        config: error.config
-      });
+      // console.error("Error saving address:", {
+      //   error,
+      //   message: error.message,
+      //   response: error.response?.data,
+      //   config: error.config
+      // });
       alert("An error occurred while saving the address.");
     }
   };
 
   const handleAddressSelection = (selectedOption) => {
-    console.log("🔹 Address selection changed:", selectedOption);
     setSelectedAddressType(selectedOption);
 
     if (selectedOption.value !== "new_address") {
       const selectedAddress = savedAddresses.find(
         (address) => address.id === selectedOption.value
       );
-      console.log("🔹 Found selected address:", selectedAddress);
 
       if (selectedAddress) {
-        console.log("🔹 Updating form with selected address data");
         setFormData({
           address: selectedAddress.address,
           postcode: selectedAddress.postcode,
@@ -203,11 +154,9 @@ const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
           city: selectedAddress.suburb,
         });
 
-        console.log("🔹 Calling onSelect with address ID:", selectedAddress.id);
         onSelect(selectedAddress.id);
       }
     } else {
-      console.log("🔹 New address selected, resetting form");
       setFormData({
         address: "",
         postcode: "",
@@ -216,17 +165,13 @@ const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
         city: "",
       });
 
-      console.log("🔹 Calling onSelect with 'new'");
       onSelect("new");
     }
   };
 
-  console.log("🔹 Rendering component with current state");
-
   return (
     <div className="card border-0 bg-light mb-4">
-      <div className="card-body p-4">
-        <h5 className="fw-bold mb-3 heading">{title}</h5>
+      <div className="card-body">
 
         {/* Address Type Selection */}
         <div className="col-md-12 mb-3">
@@ -240,31 +185,28 @@ const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
           />
         </div>
 
-        {/* Display CheckoutCard if selecting saved addresses */}
-        {selectedAddressType &&
-          selectedAddressType.value === "new_address" &&
-          savedAddresses.length > 0 && (
-            <div className="row g-4 mt-4">
-              {savedAddresses
-                .filter((address) => address.id === selectedAddressType.value)
-                .map((address) => (
-                  <CheckoutCard
-                    key={address.id}
-                    id={address.id}
-                    address={`${address.address}, ${address.suburb}, ${address.state}, ${address.postcode}`}
-                    selected={
-                      selectedOption ===
-                      `${address.address}, ${address.suburb}, ${address.state} ${address.postcode}`
-                    }
-                    onChange={() =>
-                      onSelect(
-                        `${address.address}, ${address.suburb}, ${address.state} ${address.postcode}`
-                      )
-                    }
-                  />
-                ))}
-            </div>
-          )}
+        {/* Display selected saved address in a nice box */}
+        {selectedAddressType && selectedAddressType.value !== "new_address" && (
+          <div className="mt-4">
+            {savedAddresses
+              .filter((address) => String(address.id) === String(selectedAddressType.value))
+              .map((address) => (
+                <div 
+                  key={address.id} 
+                  className="bg-white p-3 border mb-3"
+                >
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <h6 className="fw-bold mb-2">Selected Shipping Address</h6>
+                      <p className="mb-1">
+                        <i className="bi bi-geo-alt me-1 text-primary"></i> {address.address}, {address.suburb}, {address.state},{address.country}, {address.postcode}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
 
         {/* Display New Address Form when selected */}
         {selectedAddressType && selectedAddressType.value === "new_address" && (
@@ -294,7 +236,6 @@ const CheckoutCardSection = ({ title, options, selectedOption, onSelect }) => {
                   id="state"
                   value={formData.state}
                   onChange={(e) => {
-                    console.log("🔹 State selection changed:", e.target.value);
                     handleInputChange(e);
                     setFormData((prev) => ({
                       ...prev,

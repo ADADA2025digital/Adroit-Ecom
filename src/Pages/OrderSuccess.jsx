@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import api from '../Config/api';
+import api from "../Config/api";
 import emailjs from "@emailjs/browser";
 
 function OrderSummary() {
@@ -10,28 +10,28 @@ function OrderSummary() {
   const [emailStatus, setEmailStatus] = useState({
     sent: false,
     sending: false,
-    error: null
+    error: null,
   });
   const navigate = useNavigate();
   const emailTriggeredRef = useRef(false);
 
   useEffect(() => {
-    emailjs.init("x81NpKL7Q438yTjZK"); // Your EmailJS public key
+    emailjs.init("1JhpDFWb4tZlLmkCh"); // Your EmailJS public key
   }, []);
 
   const hasEmailBeenSent = (orderId) => {
-    return localStorage.getItem(`email_sent_${orderId}`) === 'true';
+    return localStorage.getItem(`email_sent_${orderId}`) === "true";
   };
 
   const markEmailAsSent = (orderId) => {
-    localStorage.setItem(`email_sent_${orderId}`, 'true');
+    localStorage.setItem(`email_sent_${orderId}`, "true");
   };
 
   const sendConfirmationEmail = async (orderData) => {
     const orderId = orderData.order_id;
-    
+
     if (hasEmailBeenSent(orderId)) {
-      setEmailStatus(prev => ({ ...prev, sent: true }));
+      setEmailStatus((prev) => ({ ...prev, sent: true }));
       return;
     }
 
@@ -46,49 +46,155 @@ function OrderSummary() {
       // Calculate the correct total from items
       const subtotal = orderData.items.reduce(
         (acc, item) => acc + parseFloat(item.unit_price) * item.quantity,
-        0
+        0,
       );
 
-      const templateParams = {
-        to_name: orderData.user_details.name || 'Customer',
-        to_email: orderData.user_details.email,
-        order_id: orderId,
-        order_date: new Date(orderData.order_date).toLocaleDateString(),
-        order_total: subtotal.toFixed(2),
-        payment_method: orderData.payment_method || "Credit Card",
-        payment_status: orderData.payment_status || "Completed",
-        shipping_address: orderData.shipping_address 
-          ? `${orderData.shipping_address.address}, ${orderData.shipping_address.suburb}, ${orderData.shipping_address.state} ${orderData.shipping_address.postcode}`
-          : "No shipping address provided",
-        items_html: orderData.items.map(item => `
-          <tr>
-            <td>
-              ${item.image ? 
-                `<img src="${item.image}" alt="${item.product_name}" className="product-image" />` : 
-                '<div className="product-image" style="background: #f5f5f5; display: flex; align-items: center; justify-content: center; color: #999;">No Image</div>'}
-            </td>
-            <td>${item.product_name}</td>
-            <td>${item.quantity}</td>
-            <td style="text-align: right;">$${(parseFloat(item.unit_price) * item.quantity).toFixed(2)}</td>
-          </tr>
-        `).join(''),
-        subtotal: subtotal.toFixed(2),
-        shipping: "FREE",
-        grand_total: subtotal.toFixed(2),
-        current_year: new Date().getFullYear()
+      // Helper function to get full image URL
+      const getFullImageUrl = (imagePath) => {
+        if (!imagePath) return "";
+        if (
+          imagePath.startsWith("http://") ||
+          imagePath.startsWith("https://")
+        ) {
+          return imagePath;
+        }
+        const baseUrl =
+          process.env.REACT_APP_API_URL || "http://localhost:5000";
+        const cleanPath = imagePath.startsWith("/")
+          ? imagePath.slice(1)
+          : imagePath;
+        return `${baseUrl}/${cleanPath}`;
       };
 
-      await emailjs.send(
-        "service_icsecqd", // Your EmailJS service ID
-        "template_2azoziq", // Your EmailJS template ID
-        templateParams
-      );
+      // Build the products HTML with images
+      const productsHtml = orderData.items
+        .map((item) => {
+          const imageUrl = getFullImageUrl(item.image);
+          const itemTotal = (
+            parseFloat(item.unit_price) * item.quantity
+          ).toFixed(2);
+          const unitPrice = parseFloat(item.unit_price).toFixed(2);
+
+          return `
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 16px;">
+          <tr>
+            <td width="70" style="padding: 8px 0; vertical-align: middle;">
+              ${
+                imageUrl
+                  ? `
+                <img src="${imageUrl}" alt="${item.product_name}" 
+                  width="60" height="60" 
+                  style="display: block; width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0;"
+                  onerror="this.onerror=null; this.src='https://via.placeholder.com/60x60?text=No+Image';"
+                />
+              `
+                  : `
+                <table width="60" height="60" cellpadding="0" cellspacing="0" border="0" 
+                  style="width: 60px; height: 60px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e2e8f0;">
+                  <tr>
+                    <td align="center" valign="middle" style="font-family: Arial, sans-serif; font-size: 10px; color: #94a3b8;">
+                      No Image
+                    </td>
+                  </tr>
+                </table>
+              `
+              }
+            </td>
+            <td style="padding: 8px 12px; vertical-align: middle;">
+              <div style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 600; color: #0b1220; margin-bottom: 4px;">
+                ${item.product_name}
+              </div>
+              <div style="font-family: Arial, sans-serif; font-size: 12px; color: #64748b;">
+                Qty: ${item.quantity} | Size: L
+              </div>
+            </td>
+            <td align="right" style="padding: 8px 0; vertical-align: middle;">
+              <div style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; color: #0b1220;">
+                $${itemTotal}
+              </div>
+              <div style="font-family: Arial, sans-serif; font-size: 11px; color: #94a3b8;">
+                $${unitPrice} each
+              </div>
+            </td>
+          </tr>
+        </table>
+        ${!item.isLast ? '<div style="height: 1px; background: #e2e8f0; margin: 8px 0;"></div>' : ""}
+      `;
+        })
+        .join("");
+
+      // Format shipping address
+      const shippingAddress = orderData.shipping_address
+        ? {
+            address: orderData.shipping_address.address || "",
+            suburb: orderData.shipping_address.suburb || "",
+            state: orderData.shipping_address.state || "",
+            postcode: orderData.shipping_address.postcode || "",
+          }
+        : null;
+
+      const templateParams = {
+        // Customer info
+        customer_name: orderData.user_details?.name || "Customer",
+        customer_email: orderData.user_details?.email,
+        customer_phone: orderData.user_details?.phone || "",
+
+        // Order info
+        order_id: orderId,
+        order_date: new Date(orderData.order_date).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        order_status: orderData.order_status || "Confirmed",
+
+        // Payment info
+        payment_method: orderData.payment_method || "Credit Card",
+        payment_status: orderData.payment_status || "Completed",
+
+        // Address info
+        shipping_address: shippingAddress?.address || "",
+        shipping_suburb: shippingAddress?.suburb || "",
+        shipping_state: shippingAddress?.state || "",
+        shipping_postcode: shippingAddress?.postcode || "",
+
+        // Products HTML - This will contain all products with images
+        products_html: productsHtml,
+
+        // Financial info
+        subtotal: subtotal.toFixed(2),
+        shipping_cost: "0.00",
+        total: subtotal.toFixed(2),
+
+        // Support info
+        support_email: "support@adroitgroup.biz",
+        support_phone: "043 317 2345",
+        store_address: "15/51 Meacher Street Mt. Druitt 2770, NSW",
+
+        // Current year for copyright
+        current_year: new Date().getFullYear().toString(),
+
+        // Tracking URL
+        tracking_url: `https://yourapp.com/track/${orderId}`,
+
+        // Unsubscribe link
+        unsubscribe_url: "#",
+      };
+
+      // console.log("Sending email with products HTML:", productsHtml);
+
+      // Send to EmailJS
+      await emailjs.send("service_atcmru7", "template_xjwh0fb", templateParams);
 
       markEmailAsSent(orderId);
       setEmailStatus({ sent: true, sending: false, error: null });
     } catch (error) {
-      console.error("Email sending failed:", error);
-      setEmailStatus({ sent: false, sending: false, error: "Failed to send confirmation email" });
+      // console.error("Email sending failed:", error);
+      setEmailStatus({
+        sent: false,
+        sending: false,
+        error: "Failed to send confirmation email",
+      });
     }
   };
 
@@ -115,14 +221,14 @@ function OrderSummary() {
           ) {
             emailTriggeredRef.current = true;
             await sendConfirmationEmail(summary);
-            console.log('email sent triggered');
           }
         } else {
           setError("Failed to load order summary");
         }
       } catch (err) {
-        console.error("Error fetching order summary:", err);
-        let errorMessage = "Failed to load order details. Please try again later.";
+        // console.error("Error fetching order summary:", err);
+        let errorMessage =
+          "Failed to load order details. Please try again later.";
         if (err.response?.status === 401) {
           errorMessage = "Authentication failed. Please log in again.";
         } else if (err.response?.data?.message) {
@@ -146,13 +252,17 @@ function OrderSummary() {
   }
 
   if (!orderSummary) {
-    return <div className="text-center py-5 text-muted">No order details available</div>;
+    return (
+      <div className="text-center py-5 text-muted">
+        No order details available
+      </div>
+    );
   }
 
   // Calculate the correct total from items only
   const subtotal = orderSummary.items.reduce(
     (acc, item) => acc + parseFloat(item.unit_price) * item.quantity,
-    0
+    0,
   );
   const total = subtotal; // Shipping is free
 
@@ -169,10 +279,10 @@ function OrderSummary() {
           <p className="text-center mt-2">
             Payment Is Successfully Processed And Your Order Is On The Way
             <br />
-
             {emailStatus.sent && (
               <span className="d-block text-success mt-2">
-                A confirmation email has been sent to your registered email address.
+                A confirmation email has been sent to{" "}
+                {orderSummary.user_details?.email}
               </span>
             )}
             {emailStatus.sending && (
@@ -205,39 +315,58 @@ function OrderSummary() {
                 {orderSummary.items.map((item) => (
                   <tr key={item.product_id}>
                     <td className="text-center" style={{ padding: "20px 0" }}>
-                      <div className="d-flex align-items-center justify-content-center" style={{ height: "100%" }}>
+                      <div
+                        className="d-flex align-items-center justify-content-center"
+                        style={{ height: "100%" }}
+                      >
                         {item.image ? (
                           <img
                             src={item.image}
                             alt={item.product_name}
                             className="border"
-                            style={{ 
-                              width: "70px", 
-                              height: "70px", 
+                            style={{
+                              width: "70px",
+                              height: "70px",
                               objectFit: "cover",
-                              maxWidth: "100%"
+                              maxWidth: "100%",
                             }}
                             onError={(e) => {
                               e.target.onerror = null;
-                              e.target.src = "https://via.placeholder.com/70x70?text=No+Image";
+                              e.target.src =
+                                "https://via.placeholder.com/70x70?text=No+Image";
                             }}
                           />
                         ) : (
-                          <div className="border d-flex align-items-center justify-content-center" 
-                              style={{ width: "70px", height: "70px", backgroundColor: "#f8f9fa" }}>
+                          <div
+                            className="border d-flex align-items-center justify-content-center"
+                            style={{
+                              width: "70px",
+                              height: "70px",
+                              backgroundColor: "#f8f9fa",
+                            }}
+                          >
                             <i className="bi bi-image text-muted"></i>
                           </div>
                         )}
                       </div>
                     </td>
                     <td className="text-center" style={{ padding: "20px 0" }}>
-                      <span style={{ fontSize: "16px" }}>{item.product_name}</span>
+                      <span style={{ fontSize: "16px" }}>
+                        {item.product_name}
+                      </span>
                     </td>
-                    <td className="text-center text-secondary" style={{ fontSize: "16px", padding: "20px 0" }}>
+                    <td
+                      className="text-center text-secondary"
+                      style={{ fontSize: "16px", padding: "20px 0" }}
+                    >
                       {item.quantity}
                     </td>
-                    <td className="text-center text-secondary" style={{ fontSize: "16px", padding: "20px 0" }}>
-                      ${(parseFloat(item.unit_price) * item.quantity).toFixed(2)}
+                    <td
+                      className="text-center text-secondary"
+                      style={{ fontSize: "16px", padding: "20px 0" }}
+                    >
+                      $
+                      {(parseFloat(item.unit_price) * item.quantity).toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -270,7 +399,8 @@ function OrderSummary() {
                       Order ID: {orderSummary.order_id}
                     </p>
                     <p className="text-secondary mb-2">
-                      Order Date: {new Date(orderSummary.order_date).toLocaleDateString()}
+                      Order Date:{" "}
+                      {new Date(orderSummary.order_date).toLocaleDateString()}
                     </p>
                     <p className="text-secondary mb-2">
                       Order Status: {orderSummary.order_status}
@@ -281,27 +411,44 @@ function OrderSummary() {
                   </div>
 
                   <div className="col-md-6">
-                    <h5 className="text-dark py-2 border-bottom">Shipping Address</h5>
+                    <h5 className="text-dark py-2 border-bottom">
+                      Shipping Address
+                    </h5>
                     {orderSummary.shipping_address ? (
                       <>
-                        <p className="mb-2">{orderSummary.shipping_address.address}</p>
                         <p className="mb-2">
-                          {orderSummary.shipping_address.suburb}, {orderSummary.shipping_address.state}
+                          {orderSummary.shipping_address.address}
                         </p>
-                        <p className="mb-4">{orderSummary.shipping_address.postcode}</p>
+                        <p className="mb-2">
+                          {orderSummary.shipping_address.suburb},{" "}
+                          {orderSummary.shipping_address.state}
+                        </p>
+                        <p className="mb-4">
+                          {orderSummary.shipping_address.postcode}
+                        </p>
                       </>
                     ) : (
-                      <p className="text-muted">No shipping address available</p>
+                      <p className="text-muted">
+                        No shipping address available
+                      </p>
                     )}
                   </div>
 
                   <div className="col-md-6">
-                    <h5 className="text-dark py-2 border-bottom">User Details</h5>
+                    <h5 className="text-dark py-2 border-bottom">
+                      User Details
+                    </h5>
                     {orderSummary.user_details ? (
                       <>
-                        <p className="mb-2">Name: {orderSummary.user_details.name}</p>
-                        <p className="mb-2">Email: {orderSummary.user_details.email}</p>
-                        <p className="mb-4">Phone: {orderSummary.user_details.phone}</p>
+                        <p className="mb-2">
+                          Name: {orderSummary.user_details.name}
+                        </p>
+                        <p className="mb-2">
+                          Email: {orderSummary.user_details.email}
+                        </p>
+                        <p className="mb-4">
+                          Phone: {orderSummary.user_details.phone}
+                        </p>
                       </>
                     ) : (
                       <p className="text-muted">No user details available</p>
@@ -309,7 +456,9 @@ function OrderSummary() {
                   </div>
 
                   <div className="px-2">
-                    <h6 className="text-dark py-2 border-bottom">Payment Method</h6>
+                    <h6 className="text-dark py-2 border-bottom">
+                      Payment Method
+                    </h6>
                     <p className="text-secondary mb-2">
                       Method: {orderSummary.payment_method || "N/A"}
                     </p>
@@ -322,11 +471,15 @@ function OrderSummary() {
                           Payment ID: {orderSummary.payment_details.payment_id}
                         </p>
                         <p className="text-secondary mb-4">
-                          Payment Date: {orderSummary.payment_details.payment_date}
+                          Payment Date:{" "}
+                          {orderSummary.payment_details.payment_date}
                         </p>
                       </>
                     )}
-                    <a href="#" className="btn btn-link text-decoration-none fw-bold p-0">
+                    <a
+                      href="#"
+                      className="btn btn-link text-decoration-none fw-bold p-0"
+                    >
                       Track Order
                     </a>
                   </div>

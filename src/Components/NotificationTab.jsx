@@ -35,7 +35,7 @@ const NotificationTab = ({
       }
     } catch (err) {
       setError("Failed to fetch notifications");
-      console.error("Error fetching notifications:", err);
+      // console.error("Error fetching notifications:", err);
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ const NotificationTab = ({
         setUnreadCount(response.data.unread_count);
       }
     } catch (err) {
-      console.error("Error fetching unread count:", err);
+      // console.error("Error fetching unread count:", err);
     }
   }, []);
 
@@ -87,10 +87,10 @@ const NotificationTab = ({
         // Refresh unread count
         fetchUnreadCount();
       } else {
-        console.error("Failed to mark as read:", response.data.message);
+        // console.error("Failed to mark as read:", response.data.message);
       }
     } catch (err) {
-      console.error("Error marking notification as read:", err);
+      // console.error("Error marking notification as read:", err);
     }
   }, [fetchUnreadCount]);
 
@@ -121,7 +121,7 @@ const NotificationTab = ({
         setUnreadCount(0);
       }
     } catch (err) {
-      console.error("Error marking all as read:", err);
+      // console.error("Error marking all as read:", err);
     }
   }, []);
 
@@ -147,10 +147,10 @@ const NotificationTab = ({
         // Refresh unread count
         fetchUnreadCount();
       } else {
-        console.error("Failed to delete notification:", response.data.message);
+        // console.error("Failed to delete notification:", response.data.message);
       }
     } catch (err) {
-      console.error("Error deleting notification:", err);
+      // console.error("Error deleting notification:", err);
     }
   }, [fetchUnreadCount]);
 
@@ -170,7 +170,7 @@ const NotificationTab = ({
         setUnreadCount(0);
       }
     } catch (err) {
-      console.error("Error clearing all notifications:", err);
+      // console.error("Error clearing all notifications:", err);
     }
   }, []);
 
@@ -184,14 +184,12 @@ const NotificationTab = ({
   // Handle View Order button click - FIXED VERSION
   const handleViewOrder = useCallback(async (orderId) => {
     try {
-      console.log("Looking for order:", orderId);
       
       // Method 1: Try to find order in existing orders from Dashboard
       if (orders && Array.isArray(orders)) {
         const existingOrder = orders.find(order => order.id === orderId);
         
         if (existingOrder) {
-          console.log("Found order in existing orders:", existingOrder);
           setSelectedOrder(existingOrder);
           setShowOrderModal(true);
           
@@ -221,7 +219,7 @@ const NotificationTab = ({
 
       for (const endpoint of endpoints) {
         try {
-          console.log(`Trying endpoint: ${endpoint}`);
+          // console.log(`Trying endpoint: ${endpoint}`);
           const response = await axios.get(endpoint, {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -231,18 +229,15 @@ const NotificationTab = ({
 
           if (response.data.success) {
             orderData = response.data.data;
-            console.log("Order data found from API:", orderData);
+            // console.log("Order data found from API:", orderData);
             break;
           }
         } catch (apiError) {
-          console.log(`Endpoint ${endpoint} failed:`, apiError.message);
           continue;
         }
       }
 
       if (!orderData) {
-        // Method 3: Create a mock order object from notification data
-        console.log("Creating order from notification data");
         const notification = notifications.find(
           n => n.data?.order_id === orderId
         );
@@ -295,7 +290,7 @@ const NotificationTab = ({
       }
 
     } catch (err) {
-      console.error("Error handling view order:", err);
+      // console.error("Error handling view order:", err);
       
       // Show user-friendly error message
       // Using window.alert as a fallback since Swal is not defined

@@ -69,7 +69,7 @@ const Cart = () => {
       // Cache the cart data for instant loading next time
       localStorage.setItem("cached_cart", JSON.stringify(cartData));
     } catch (err) {
-      console.error("❌ Cart load error", err);
+      // console.error("Cart load error", err);
       setError("Failed to load cart. Please try again.");
       // Don't clear cart on error - keep showing cached data
     }
@@ -115,7 +115,7 @@ const Cart = () => {
       // Update cache
       localStorage.setItem("cached_cart", JSON.stringify(updatedCart));
     } catch (err) {
-      console.error("❌ Failed to update quantity", err);
+      // console.error("Failed to update quantity", err);
       // Revert UI on error
       setCart(cart);
       alert("Failed to update quantity.");
@@ -146,7 +146,7 @@ const Cart = () => {
       // Update cache
       localStorage.setItem("cached_cart", JSON.stringify(updatedCart));
     } catch (err) {
-      console.error("❌ Failed to remove item", err);
+      // console.error("Failed to remove item", err);
       // Revert UI on error
       setCart(previousCart);
       alert("Failed to remove item.");

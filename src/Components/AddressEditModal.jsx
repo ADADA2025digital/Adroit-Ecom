@@ -78,7 +78,7 @@ const AddressEditModal = ({ show, onClose, address, onSaved }) => {
         throw new Error(data?.message || "Failed to update address");
       }
     } catch (err) {
-      console.error("Error updating address:", err);
+      // console.error("Error updating address:", err);
       Swal.fire({
         title: "Error",
         text:

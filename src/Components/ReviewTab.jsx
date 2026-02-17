@@ -59,14 +59,13 @@ const ReviewTab = ({ user, getItemImageUrl }) => {
         })
       );
       setReviewItems(transformedItems);
-      console.log("Reviewable products:", transformedItems);
 
       return {
         items: transformedItems,
         summary: response.data.summary,
       };
     } catch (error) {
-      console.error("Error fetching reviewable products:", error);
+      // console.error("Error fetching reviewable products:", error);
       
       let errorMessage = "Failed to load reviewable products";
       if (error.response?.status === 401) {
@@ -262,23 +261,9 @@ const ReviewTab = ({ user, getItemImageUrl }) => {
         });
       }
 
-      // Debug: Log what's being sent (remove in production)
-      console.log("Submitting review with data:", {
-        product_id: productId,
-        order_id: orderId,
-        rating: normalizedRating,
-        comment: fd.comment.trim(),
-        image_count: fd.images?.length || 0,
-        images: fd.images?.map(img => ({
-          name: img.name,
-          type: img.type,
-          size: img.size
-        }))
-      });
-
       // Log FormData entries (for debugging)
       for (const [key, value] of formData.entries()) {
-        console.log(`FormData: ${key} =`, value);
+        // console.log(`FormData: ${key} =`, value);
       }
 
       // Use the centralized API for FormData submission
@@ -311,7 +296,7 @@ const ReviewTab = ({ user, getItemImageUrl }) => {
         return nd;
       });
     } catch (error) {
-      console.error("Error in review submission:", error);
+      // console.error("Error in review submission:", error);
 
       let errorMessage = "Failed to submit review. Please try again.";
       if (error.response?.data?.message) {

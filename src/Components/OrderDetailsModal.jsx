@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
-import api from '../Config/api';
+import api from "../Config/api";
 
 const OrderDetailsModal = ({
   showOrderModal,
@@ -20,7 +20,7 @@ const OrderDetailsModal = ({
   const [reviewedItems, setReviewedItems] = useState(new Set());
   const [selectedReason, setSelectedReason] = useState("");
   const [customReason, setCustomReason] = useState("");
-  
+
   // Live order data state
   const [liveOrderData, setLiveOrderData] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
@@ -33,12 +33,12 @@ const OrderDetailsModal = ({
 
       try {
         const response = await api.get(`/orders/${selectedOrder.id}`);
-        
+
         if (response.data.success) {
           setLiveOrderData(response.data.data);
         }
       } catch (err) {
-        console.error("Error fetching live order data:", err);
+        // console.error("Error fetching live order data:", err);
       }
     };
     if (showOrderModal && selectedOrder) {
@@ -62,15 +62,44 @@ const OrderDetailsModal = ({
 
   // Clean up polling when modal closes
   useEffect(() => {
-    if (!showOrderModal && pollingInterval) {
-      clearInterval(pollingInterval);
-      setPollingInterval(null);
+    if (showOrderModal) {
+      // Save current scroll position
+      const scrollY = window.scrollY;
+
+      // Add class to body to prevent scrolling
+      document.body.classList.add("modal-open");
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+    } else {
+      // Restore scrolling and scroll position
+      const scrollY = document.body.style.top;
+      document.body.classList.remove("modal-open");
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+
+      // Restore scroll position
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
     }
+
+    // Cleanup function
+    return () => {
+      document.body.classList.remove("modal-open");
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+    };
   }, [showOrderModal]);
 
   // Use live data if available, otherwise use the original selectedOrder
   const order = liveOrderData || selectedOrder?.fullData;
-  
+
   if (!order) return null;
 
   const isShipped = (order.orderstatus ?? "").toLowerCase() === "shipped";
@@ -116,10 +145,10 @@ const OrderDetailsModal = ({
         (order.orderstatus ?? "").toLowerCase() === "delivered"
           ? "bg-success"
           : (order.orderstatus ?? "").toLowerCase() === "processing"
-          ? "bg-warning text-dark"
-          : (order.orderstatus ?? "").toLowerCase() === "shipped"
-          ? "bg-info text-dark"
-          : "bg-secondary"
+            ? "bg-warning text-dark"
+            : (order.orderstatus ?? "").toLowerCase() === "shipped"
+              ? "bg-info text-dark"
+              : "bg-secondary"
       }`}
     >
       {(order.orderstatus ?? "N/A").charAt(0).toUpperCase() +
@@ -678,7 +707,7 @@ const OrderDetailsModal = ({
                       {order.delivered_at
                         ? new Date(order.delivered_at).toLocaleDateString()
                         : new Date(
-                            order.updated_at ?? order.created_at
+                            order.updated_at ?? order.created_at,
                           ).toLocaleDateString()}
                     </strong>
                   </div>
@@ -704,7 +733,7 @@ const OrderDetailsModal = ({
                 order.items.map((item, index) => {
                   const price =
                     parseFloat(
-                      item.ord_price ?? item.unit_price ?? item.price ?? "0"
+                      item.ord_price ?? item.unit_price ?? item.price ?? "0",
                     ) || 0;
                   const quantity =
                     parseInt(item.ord_quantity ?? item.quantity ?? "1", 10) ||
@@ -790,7 +819,7 @@ const OrderDetailsModal = ({
                           >
                             Buy this again
                           </button>
-                          {!isItemReviewed && (
+                          {!isItemReviewed && isShipped && (
                             <button
                               className="btn btn-outline-primary btn-sm w-100 rounded-0"
                               onClick={() => toggleReviewSection(index)}
@@ -889,7 +918,7 @@ const OrderDetailsModal = ({
                                 handleReviewChange(
                                   index,
                                   "comment",
-                                  e.target.value
+                                  e.target.value,
                                 )
                               }
                             />
@@ -939,7 +968,7 @@ const OrderDetailsModal = ({
                                       }
                                     />
                                   </div>
-                                )
+                                ),
                               )}
                             </div>
                           </div>

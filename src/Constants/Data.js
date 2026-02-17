@@ -9,6 +9,10 @@ import Client8 from "../Assets/Images/client-8.png";
 import Product1 from "../Assets/Images/product.jpg";
 import Product2 from "../Assets/Images/product2.jpg";
 import axios from "axios";
+import asialIcon from "../Assets/Images/member.svg";
+import licenseIcon from "../Assets/Images/police.svg";
+import certIcon from "../Assets/Images/certificate.svg";
+import insuranceIcon from "../Assets/Images/insurance.svg";
 
 export const Clients = [
   Client1,
@@ -47,19 +51,19 @@ export const fetchProducts = async () => {
       `${import.meta.env.VITE_API_URL}api/products`
     );
 
-    // console.log("Full API Response:", response); // ✅ Log full response
-    // console.log("Response Data:", response.data); // ✅ Log only data
+    // console.log("Full API Response:", response); 
+    // console.log("Response Data:", response.data); 
 
     if (response.data && Array.isArray(response.data.products)) {
-      // console.log("✅ Products Fetched:", response.data.products); // ✅ Log products array
+      // console.log("Products Fetched:", response.data.products); 
       return response.data.products;
     } else {
-      // console.error("❌ Invalid API response format:", response.data);
+      // console.error("Invalid API response format:", response.data);
       return [];
     }
   } catch (error) {
     //  console.error(
-    //   "❌ Error fetching products:",
+    //   "Error fetching products:",
     //   error.response ? error.response.data : error.message
     // );
     return [];
@@ -332,5 +336,28 @@ export const notifications = [
     message:
       "Your order has been successfully placed, Order ID: #1009, Thank you for choosing us.",
     time: "21 Jun 2024 04:29:PM",
+  },
+];
+
+export const whyChooseUsData = [
+  {
+    title: "ASIAL Silver Corporate Membership",
+    desc: "Australian Security Industry Association Ltd (ASIAL). Silver Membership No: C8339.",
+    icon: asialIcon,
+  },
+  {
+    title: "Police Security Master License",
+    desc: "Police Security Master License No: 000101930. Expiry: 10/2025.",
+    icon: licenseIcon,
+  },
+  {
+    title: "Authorized Certifications",
+    desc: "Cabling Certification, Dynalite Certifications and Bosch Security Certified Partner.",
+    icon: certIcon,
+  },
+  {
+    title: "Insurance & Compensation",
+    desc: "Public Liability Insurance for $20 million and Workers Compensation.",
+    icon: insuranceIcon,
   },
 ];

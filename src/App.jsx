@@ -13,7 +13,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "bootstrap-icons/font/bootstrap-icons.css";
 
-import "../src/Assets/Styles/Style.css";
+import "./Assets/Styles/Style.css";
 import axios from "axios";
 
 import Header from "./Components/Header";
@@ -41,6 +41,7 @@ import ProductDetails from "./Pages/ProductDetails";
 import InvoicePage from "./Pages/Invoice";
 import AdminPrivateRoute from "./AdminPrivateRoute";
 import PasswordReset from "./Pages/PasswordReset";
+import Categories from "./Pages/Categories";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
@@ -103,6 +104,7 @@ function App() {
               <Route path="/reset-password" element={<PasswordReset />} />
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
+              <Route path="/categories" element={<Categories />} />
               <Route path="/shop" element={<Shop />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/cart" element={<ViewCart />} />

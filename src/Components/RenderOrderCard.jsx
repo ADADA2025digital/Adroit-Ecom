@@ -44,6 +44,8 @@ const RenderOrderCard = ({
     orderBadgeClass = "bg-warning text-dark";
   else if (shipKey.includes("shipped") || shipKey.includes("ship"))
     orderBadgeClass = "bg-info text-dark";
+  else if (shipKey.includes("cancelled") || shipKey.includes("canceled") || shipKey.includes("cancelled"))
+    orderBadgeClass = "bg-danger";
 
   const orderBadgeLabel = shipRaw
     ? shipRaw[0].toUpperCase() + shipRaw.slice(1)
@@ -52,6 +54,7 @@ const RenderOrderCard = ({
   const isUnpaid = !isPaid;
   const isProcessing = shipKey === "processing" || shipKey === "pending";
   const isShipped = shipKey.includes("shipped") || shipKey.includes("ship");
+  const isCancelled = shipKey.includes("cancelled") || shipKey.includes("canceled") || shipKey.includes("cancelled");
 
   const handleBuyAgain = async (order) => {
     try {
@@ -199,14 +202,14 @@ const RenderOrderCard = ({
         </div>
 
         <div className="col-md-4 d-flex flex-column gap-2">
-          {isUnpaid ? (
+          {!isCancelled && isUnpaid ? (
             <button
               className="btn btn-primary btn-sm rounded-0"
               onClick={() => redirectToPaymentBySummary(order.id)}
             >
               Pay Now
             </button>
-          ) : isProcessing ? (
+          ) : !isCancelled && isProcessing ? (
             <>
               <button className="btn btn-primary btn-sm rounded-0">
                 Track
@@ -218,7 +221,7 @@ const RenderOrderCard = ({
                 Buy this again
               </button>
             </>
-          ) : isShipped ? (
+          ) : !isCancelled && isShipped ? (
             <>
               <button className="btn btn-primary btn-sm rounded-0">
                 Track
@@ -236,7 +239,7 @@ const RenderOrderCard = ({
                 Buy this again
               </button>
             </>
-          ) : (
+          ) : !isCancelled ? (
             <>
               <button className="btn btn-primary btn-sm rounded-0">
                 Track
@@ -253,6 +256,16 @@ const RenderOrderCard = ({
               >
                 Leave a review
               </button>
+              <button
+                className="btn btn-outline-dark btn-sm rounded-0"
+                onClick={() => handleBuyAgain(order)}
+              >
+                Buy this again
+              </button>
+            </>
+          ) : (
+            // For cancelled orders, only show limited options
+            <>
               <button
                 className="btn btn-outline-dark btn-sm rounded-0"
                 onClick={() => handleBuyAgain(order)}

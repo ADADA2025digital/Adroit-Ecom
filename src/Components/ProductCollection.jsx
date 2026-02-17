@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import api from '../Config/api';
+import api from "../Config/api";
+import GlobalButton from "./Button";
 
 const ProductCollection = () => {
   const [categories, setCategories] = useState([]);
@@ -13,7 +14,7 @@ const ProductCollection = () => {
       const response = await api.get("/getcategory");
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
-      console.error("Failed to fetch categories:", error);
+      // console.error("Failed to fetch categories:", error);
       throw new Error("Failed to fetch categories");
     }
   };
@@ -25,7 +26,7 @@ const ProductCollection = () => {
       const list = data?.products ?? data ?? [];
       return Array.isArray(list) ? list : [];
     } catch (error) {
-      console.error("Failed to fetch products:", error);
+      // console.error("Failed to fetch products:", error);
       throw new Error("Failed to fetch products");
     }
   };
@@ -62,7 +63,8 @@ const ProductCollection = () => {
 
   // Helpers
   const normalizeImageUrl = (p) => {
-    const fromArray = p?.images?.[0]?.imgurl || p?.images?.[0]?.url || p?.images?.[0];
+    const fromArray =
+      p?.images?.[0]?.imgurl || p?.images?.[0]?.url || p?.images?.[0];
     const single =
       p?.image?.imgurl || p?.image?.url || p?.imgurl || p?.url || p?.thumbnail;
     return fromArray || single || null;
@@ -110,14 +112,14 @@ const ProductCollection = () => {
         Product Categories
       </h2>
 
-      {error && (
+      {/* {error && (
         <div className="alert alert-danger" role="alert">
           {error}{" "}
           <button className="btn btn-link" onClick={handleRetry}>
             Retry
           </button>
         </div>
-      )}
+      )} */}
 
       <div className="row d-flex justify-content-center align-items-center">
         {/* Before first attempt completes, render a few skeleton circles so it feels instant */}
@@ -129,7 +131,10 @@ const ProductCollection = () => {
             >
               <Skeleton />
               <div className="text-center mt-1">
-                <div className="placeholder-wave" style={{ width: 80, height: 16 }} />
+                <div
+                  className="placeholder-wave"
+                  style={{ width: 80, height: 16 }}
+                />
               </div>
             </div>
           ))
@@ -154,14 +159,21 @@ const ProductCollection = () => {
                       alt={name}
                       className="img-fluid"
                       loading="lazy"
-                      style={{ objectFit: "cover", width: "100%", height: "100%" }}
+                      style={{
+                        objectFit: "cover",
+                        width: "100%",
+                        height: "100%",
+                      }}
                     />
                   ) : (
                     <div
                       className="bg-light d-flex align-items-center justify-content-center"
                       style={{ width: "100%", height: "100%" }}
                     >
-                      <i className="bi bi-image text-muted" style={{ fontSize: 42 }} />
+                      <i
+                        className="bi bi-image text-muted"
+                        style={{ fontSize: 42 }}
+                      />
                     </div>
                   )}
                 </div>
@@ -176,6 +188,11 @@ const ProductCollection = () => {
         ) : (
           <p className="text-muted">No categories available</p>
         )}
+        <div className="d-flex justify-content-center align-items-center mt-4">
+          <GlobalButton type="submit" to="/categories">
+            View More
+          </GlobalButton>
+        </div>
       </div>
 
       {/* minimal CSS for skeleton shimmer */}

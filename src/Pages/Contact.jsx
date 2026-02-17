@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Helmet } from "react-helmet-async";
 import PageHeader from "../Components/PageHeader";
+import GlobalButton from "../Components/Button";
 
 const ContactForm = () => {
   const contactDetails = [
@@ -194,6 +196,60 @@ const ContactForm = () => {
 
   return (
     <>
+      <Helmet>
+        {/* Basic SEO */}
+        <title>Contact Us | Adroit Alarm Systems</title>
+        <meta
+          name="description"
+          content="ADROIT is a premier Australian security company specializing in Electronic Security, Home Automation, Audio Visual, Data Cabling, and Ducted Vacuum systems. ASIAL accredited with 20+ years of experience delivering integrated, hassle-free solutions."
+        />
+        <meta
+          name="keywords"
+          content="ADROIT, Adroit Alarm System, security companies Australia, electronic security Sydney, home automation Australia, audio visual installation, data cabling contractors, ducted vacuum systems, ASIAL Silver Member, security license holders, integrated security solutions, Dynalite certified, commercial security, residential automation, access control, CCTV installation Australia"
+        />
+        <meta name="author" content="ADROIT Alarm Systems Australia" />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://shop.adroitalarm.com.au/" />
+
+        {/* Open Graph */}
+        <meta
+          property="og:title"
+          content="ADROIT Alarm Systems | Electronic Security & Automation Experts"
+        />
+        <meta
+          property="og:description"
+          content="Since 2008, ADROIT has delivered premium integrated solutions including security, automation, and AV. Fully licensed (Master License No: 000101930) and ASIAL accredited."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://shop.adroitalarm.com.au/" />
+        <meta property="og:site_name" content="ADROIT Alarm Systems" />
+
+        {/* Social Links */}
+        <meta
+          property="og:see_also"
+          content="https://www.instagram.com/adroitalarm/"
+        />
+        <meta
+          property="og:see_also"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Facebook  */}
+        <meta property="fb:app_id" content="#" />
+        <meta
+          property="fb:admins"
+          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
+        />
+
+        {/* Instagram */}
+        <meta name="instagram:title" content="ADROIT Alarm Systems Australia" />
+        <meta
+          name="instagram:description"
+          content="Integrated solutions in electronic security, automation, audio visual and data cabling. Trusted Australian security specialists since 2008."
+        />
+        <meta name="instagram:site" content="@adroitalarm" />
+      </Helmet>
+
       <div className="container-fluid p-0">
         <PageHeader title="Contact Us" path="Home / Contact Us" />
 
@@ -349,12 +405,13 @@ const ContactForm = () => {
                       </div>
                     )}
 
-                    <button
+                    <GlobalButton
                       type="submit"
-                      className="btn btn-primary rounded-0 w-100"
+                      className="w-100"
+                      onClick={handleSubmit}
                     >
                       Send Your Message
-                    </button>
+                    </GlobalButton>
                   </form>
                 </div>
               </div>
@@ -366,7 +423,7 @@ const ContactForm = () => {
           <div className="col-12 ">
             <iframe
               title="map"
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3153.835434509362!2d144.95565141589513!3d-37.81732717975188!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad642af0f11fd81%3A0xf577f7843dfd2dfd!2sVictoria%20Market!5e0!3m2!1sen!2sus!4v1614649485613!5m2!1sen!2sus"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3317.0174901083697!2d150.8269488!3d-33.7602139!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6b129a4ff0e259f1%3A0xc61942d43fc0457!2sUnit%2015%2F51%20Meacher%20St%2C%20Mount%20Druitt%20NSW%202770%2C%20Australia!5e0!3m2!1sen!2slk!4v1771153737036!5m2!1sen!2slk"
               width="100%"
               height="400"
               allowFullScreen=""
