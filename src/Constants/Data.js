@@ -11,8 +11,8 @@ import Product2 from "../Assets/Images/product2.jpg";
 import axios from "axios";
 import asialIcon from "../Assets/Images/member.svg";
 import licenseIcon from "../Assets/Images/police.svg";
-import certIcon from "../Assets/Images/certificate.svg";
-import insuranceIcon from "../Assets/Images/insurance.svg";
+import certIcon from "../Assets/Images/Certificate.svg";
+import insuranceIcon from "../Assets/Images/Insurance.svg";
 
 export const Clients = [
   Client1,
