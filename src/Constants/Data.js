@@ -50,21 +50,21 @@ export const fetchProducts = async (options = {}) => {
     const baseURL = import.meta.env.VITE_API_URL;
     const response = await axios.get(`${baseURL}api/products`);
 
-    console.log("Raw API Response:", response.data);
-    console.log("Products array length:", response.data.products?.length);
-    console.log("Total count from API:", response.data.count);
+    // console.log("Raw API Response:", response.data);
+    // console.log("Products array length:", response.data.products?.length);
+    // console.log("Total count from API:", response.data.count);
 
     if (response.data && Array.isArray(response.data.products)) {
       // Check for duplicate IDs
       const products = response.data.products;
       const uniqueIds = new Set(products.map(p => p.id || p.product_id));
-      console.log("Unique product IDs:", uniqueIds.size);
+      // console.log("Unique product IDs:", uniqueIds.size);
       
       return products;
     }
     return [];
   } catch (error) {
-    console.error("Error fetching products:", error);
+    // console.error("Error fetching products:", error);
     return [];
   }
 };

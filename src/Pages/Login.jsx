@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import PageHeader from "../Components/PageHeader";
 import api from '../Config/api';
 import GlobalButton from "../Components/Button";
+import { useCart } from "../Components/CartContext"; // Add this import
 
 const Login = ({ setIsLoggedIn }) => {
   const [loginInput, setLogin] = useState({
@@ -15,11 +16,12 @@ const Login = ({ setIsLoggedIn }) => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const { syncGuestCartAfterLogin } = useCart(); // Get the synca function
   const from = location.state?.from || "/dashboard";
 
   const handleInput = (e) => {
     setLogin({ ...loginInput, [e.target.name]: e.target.value });
-    setError(""); // Clear error when user types
+    setError("");
   };
 
   const togglePasswordVisibility = () => {
@@ -34,30 +36,28 @@ const Login = ({ setIsLoggedIn }) => {
     setError("");
 
     try {
-      // Direct login call without CSRF - just like Postman
-      // console.log("Sending login request:", { email: loginInput.email, password: loginInput.password });
-      
       const res = await api.post(`/login`, {
         email: loginInput.email,
         password: loginInput.password,
       });
 
-      // console.log("Login response:", res.data);
-
       if (res.data.token) {
-        // Store auth data based on your Postman response
+        // Store auth data
         localStorage.setItem("auth_token", res.data.token);
         localStorage.setItem("user", JSON.stringify(res.data.data));
         localStorage.setItem("role", res.data.data.role_id);
         
         setIsLoggedIn(true);
-        // console.log("Login successful, navigating to:", from);
+        
+        // IMPORTANT: Sync guest cart after successful login
+        // This will merge guest items with user's existing cart
+        await syncGuestCartAfterLogin();
+        
         navigate(from, { replace: true });
       }
     } catch (error) {
       console.error("Login error:", error);
       
-      // Set user-friendly error message
       if (error.response?.data?.message) {
         setError(error.response.data.message);
       } else if (error.response?.status === 401) {
@@ -79,9 +79,8 @@ const Login = ({ setIsLoggedIn }) => {
         <div className="row py-5 align-items-stretch">
           {/* Login Column */}
           <div className="col-md-6 mb-4 mb-md-0">
-            <h2 className="mb-4 text-uppercase heading">LOGIN</h2> {/* Heading outside box */}
+            <h2 className="mb-4 text-uppercase heading">LOGIN</h2>
             <div className="p-4 border bg-light shadow-sm h-100 d-flex flex-column">
-              {/* Error Message */}
               {error && (
                 <div className="alert alert-danger" role="alert">
                   {error}
@@ -157,7 +156,7 @@ const Login = ({ setIsLoggedIn }) => {
 
           {/* New Customer Column */}
           <div className="col-md-6">
-            <h2 className="mb-4 heading">NEW CUSTOMER</h2> {/* Heading outside box */}
+            <h2 className="mb-4 heading">NEW CUSTOMER</h2>
             <div className="p-4 border bg-light shadow-sm h-100 d-flex flex-column">
               <div className="d-flex flex-column">
                 <h3 className="h5 mb-3 heading">Create an account</h3>

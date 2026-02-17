@@ -94,41 +94,23 @@ const PasswordReset = () => {
   // Function to send email using EmailJS
   const sendEmailWithEmailJS = async (email, otpCode, resetToken) => {
     try {
-      // console.log("Sending email via EmailJS to:", email);
-      // console.log("OTP Code to send:", otpCode);
-
-      // Get current date and time in the desired format
-      const now = new Date();
-      const formattedDate = now.toLocaleDateString("en-US", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-
-      // Format: "12 Nov, 2021" style
-      const emailDate = now
-        .toLocaleDateString("en-US", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-        .replace(",", ""); // Remove comma after month if needed
-
-      // Prepare the template parameters - using the EXACT variable names from your EmailJS template
       const templateParams = {
         to_email: email,
         to_name: email.split("@")[0],
-        otpCode: otpCode, // This should match {{otpCode}} in your EmailJS template
+        otpCode: otpCode,
         reset_link: `${window.location.origin}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`,
         year: new Date().getFullYear(),
         subject: "Password Reset Verification Code",
         message: "Your verification code for password reset",
-        current_date: emailDate, // Add this for the date in the email header
+        current_date: new Date()
+          .toLocaleDateString("en-US", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })
+          .replace(",", ""),
       };
 
-      // console.log("EmailJS template params:", templateParams);
-
-      // Send the email
       const response = await emailjs.send(
         EMAILJS_CONFIG.SERVICE_ID,
         EMAILJS_CONFIG.TEMPLATE_ID,
@@ -136,23 +118,22 @@ const PasswordReset = () => {
         EMAILJS_CONFIG.PUBLIC_KEY,
       );
 
-      // console.log("EmailJS response:", response);
-
-      if (response.status === 200) {
-        return { success: true, message: "Email sent successfully" };
-      } else {
-        return { success: false, message: "Failed to send email" };
-      }
+      // console.log("EmailJS success response:", response);
+      return { success: true, message: "Email sent successfully" };
     } catch (error) {
-      // console.error("EmailJS error:", error);
-      // console.error("Error details:", {
-      //   text: error.text,
-      //   message: error.message,
-      //   status: error.status,
-      // });
+      // console.error("Error message:", error.message);
+
+      // Log the actual response if available
+      if (error.response) {
+        // console.error("Error response:", error.response);
+      }
+
       return {
         success: false,
-        message: error.text || "Failed to send email. Please try again.",
+        message:
+          error.text ||
+          error.message ||
+          "Failed to send email. Please try again.",
       };
     }
   };
