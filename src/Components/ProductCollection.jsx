@@ -7,14 +7,13 @@ const ProductCollection = () => {
   const [products, setProducts] = useState([]);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [firstAttemptDone, setFirstAttemptDone] = useState(false); // prevents early "No categories"
+  const [firstAttemptDone, setFirstAttemptDone] = useState(false);
 
   const fetchCategories = async () => {
     try {
       const response = await api.get("/getcategory");
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
-      // console.error("Failed to fetch categories:", error);
       throw new Error("Failed to fetch categories");
     }
   };
@@ -26,12 +25,27 @@ const ProductCollection = () => {
       const list = data?.products ?? data ?? [];
       return Array.isArray(list) ? list : [];
     } catch (error) {
-      // console.error("Failed to fetch products:", error);
       throw new Error("Failed to fetch products");
     }
   };
 
-  // Incremental load — set each dataset as soon as it arrives
+  // Function to shuffle array and get random items
+  const getRandomCategories = (categoriesArray, count = 6) => {
+    if (!categoriesArray || categoriesArray.length === 0) return [];
+    
+    // Create a copy of the array to avoid mutating original
+    const shuffled = [...categoriesArray];
+    
+    // Fisher-Yates shuffle algorithm
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    // Return first 'count' items
+    return shuffled.slice(0, count);
+  };
+
   const loadData = async () => {
     setError(null);
     setFirstAttemptDone(false);
@@ -58,10 +72,13 @@ const ProductCollection = () => {
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryCount]);
 
-  // Helpers
+  // Get random 6 categories whenever categories array changes
+  const randomCategories = useMemo(() => {
+    return getRandomCategories(categories, 6);
+  }, [categories]);
+
   const normalizeImageUrl = (p) => {
     const fromArray =
       p?.images?.[0]?.imgurl || p?.images?.[0]?.url || p?.images?.[0];
@@ -90,7 +107,6 @@ const ProductCollection = () => {
     return map;
   }, [categories, products]);
 
-  // Simple skeleton circle (no spinner) for instant feel
   const Skeleton = () => (
     <div
       className="me-0 mb-3 border rounded-circle"
@@ -112,17 +128,8 @@ const ProductCollection = () => {
         Product Categories
       </h2>
 
-      {/* {error && (
-        <div className="alert alert-danger" role="alert">
-          {error}{" "}
-          <button className="btn btn-link" onClick={handleRetry}>
-            Retry
-          </button>
-        </div>
-      )} */}
-
       <div className="row d-flex justify-content-center align-items-center">
-        {/* Before first attempt completes, render a few skeleton circles so it feels instant */}
+        {/* Show skeletons while loading */}
         {!firstAttemptDone && categories.length === 0 ? (
           Array.from({ length: 6 }).map((_, i) => (
             <div
@@ -138,8 +145,8 @@ const ProductCollection = () => {
               </div>
             </div>
           ))
-        ) : categories.length > 0 ? (
-          categories.map((category, index) => {
+        ) : randomCategories.length > 0 ? (
+          randomCategories.map((category, index) => {
             const itemImage = categoryImageMap[category.id] || null;
             const name = category?.categoryname || "Category";
             const desc = category?.cat_description || "";
@@ -180,7 +187,7 @@ const ProductCollection = () => {
 
                 <div className="text-center mt-1">
                   <h6 className="heading text-primary mb-1">{name}</h6>
-                  {!!desc && <p className="m-0 small">{desc}</p>}
+                  {/* {!!desc && <p className="m-0 small">{desc}</p>} */}
                 </div>
               </div>
             );
@@ -188,14 +195,17 @@ const ProductCollection = () => {
         ) : (
           <p className="text-muted">No categories available</p>
         )}
-        <div className="d-flex justify-content-center align-items-center mt-4">
-          <GlobalButton type="submit" to="/categories">
-            View More
-          </GlobalButton>
-        </div>
+        
+        {/* Only show View More button if there are more than 6 categories */}
+        {categories.length > 6 && (
+          <div className="d-flex justify-content-center align-items-center mt-4">
+            <GlobalButton type="submit" to="/categories">
+              View More
+            </GlobalButton>
+          </div>
+        )}
       </div>
 
-      {/* minimal CSS for skeleton shimmer */}
       <style>{`
         @keyframes shine {
           0% { background-position: 100% 0; }

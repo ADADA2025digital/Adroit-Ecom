@@ -14,7 +14,7 @@ import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 const Shop = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState("Ascending Order");
-  const [itemsPerPage, setItemsPerPage] = useState(12);
+  const [itemsPerPage, setItemsPerPage] = useState(12); // Default to 12 products per page
   const [currentPage, setCurrentPage] = useState(1);
   const [isOpen, setIsOpen] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -23,8 +23,8 @@ const Shop = () => {
   const [selectedRatings, setSelectedRatings] = useState([]);
   const [gridView, setGridView] = useState("grid-4");
   const [loading, setLoading] = useState(true);
-  const [priceRange, setPriceRange] = useState([50, 5000]);
-  const [debouncedPriceRange, setDebouncedPriceRange] = useState([50, 5000]);
+  const [priceRange, setPriceRange] = useState([0, 10000]);
+  const [debouncedPriceRange, setDebouncedPriceRange] = useState([0, 10000]);
 
   // State for custom dropdowns
   const [isSortOpen, setIsSortOpen] = useState(false);
@@ -36,6 +36,35 @@ const Shop = () => {
     ratings: false,
     priceRange: false,
   });
+
+  // Calculate min and max price from products
+  const priceBounds = useMemo(() => {
+    if (!Array.isArray(products) || products.length === 0) {
+      return { min: 0, max: 10000 };
+    }
+
+    const prices = products
+      .map((p) => parseFloat(p.pro_price || p.price || 0))
+      .filter((p) => p > 0);
+    
+    if (prices.length === 0) {
+      return { min: 0, max: 10000 };
+    }
+
+    return {
+      min: Math.floor(Math.min(...prices)),
+      max: Math.ceil(Math.max(...prices)),
+    };
+  }, [products]);
+
+  // Set initial price range based on actual product prices
+  useEffect(() => {
+    if (products.length > 0) {
+      const { min, max } = priceBounds;
+      setPriceRange([min, max]);
+      setDebouncedPriceRange([min, max]);
+    }
+  }, [products, priceBounds]);
 
   // Toggle section collapse
   const toggleSection = (section) => {
@@ -127,14 +156,6 @@ const Shop = () => {
       .custom-select-option.selected:hover {
         background-color: #0b5ed7;
       }
-
-      .sort-dropdown .custom-select-option:last-child {
-        border-bottom: 3px solid #0d6efd;
-      }
-
-      .items-dropdown .custom-select-option:last-child {
-        border-bottom: 3px solid #0d6efd;
-      }
     `;
     document.head.appendChild(style);
     return () => style.remove();
@@ -158,22 +179,23 @@ const Shop = () => {
 
   // Memoized filtered products by search, price, categories, and ratings
   const filteredProducts = useMemo(() => {
-    if (!Array.isArray(products)) {
+    if (!Array.isArray(products) || products.length === 0) {
       return [];
     }
 
     return products.filter((product) => {
-      const name = product.productname ? product.productname.toLowerCase() : "";
+      const name = (product.productname || product.name || "").toLowerCase();
       const matchesSearch = name.includes(searchQuery.toLowerCase());
 
-      const productPrice = parseFloat(product.pro_price || 0);
+      const productPrice = parseFloat(product.pro_price || product.price || 0);
       const matchesPrice =
         productPrice >= debouncedPriceRange[0] &&
         productPrice <= debouncedPriceRange[1];
 
+      const categoryId = product.category_id || product.categoryId;
       const matchesCategory =
         selectedCategories.length === 0 ||
-        selectedCategories.includes(product.category_id);
+        selectedCategories.includes(categoryId);
 
       const matchesRating =
         selectedRatings.length === 0 ||
@@ -201,19 +223,19 @@ const Shop = () => {
 
     if (sortOrder === "Ascending Order") {
       sorted.sort((a, b) =>
-        (a.productname || "").localeCompare(b.productname || ""),
+        (a.productname || a.name || "").localeCompare(b.productname || b.name || ""),
       );
     } else if (sortOrder === "Descending Order") {
       sorted.sort((a, b) =>
-        (b.productname || "").localeCompare(a.productname || ""),
+        (b.productname || b.name || "").localeCompare(a.productname || a.name || ""),
       );
     } else if (sortOrder === "Low - High Price") {
       sorted.sort(
-        (a, b) => parseFloat(a.pro_price || 0) - parseFloat(b.pro_price || 0),
+        (a, b) => parseFloat(a.pro_price || a.price || 0) - parseFloat(b.pro_price || b.price || 0),
       );
     } else if (sortOrder === "High - Low Price") {
       sorted.sort(
-        (a, b) => parseFloat(b.pro_price || 0) - parseFloat(a.pro_price || 0),
+        (a, b) => parseFloat(b.pro_price || b.price || 0) - parseFloat(a.pro_price || a.price || 0),
       );
     }
     return sorted;
@@ -224,26 +246,10 @@ const Shop = () => {
 
   // Paginated products
   const paginatedProducts = useMemo(() => {
-    return sortedProducts.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage,
-    );
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return sortedProducts.slice(startIndex, endIndex);
   }, [sortedProducts, currentPage, itemsPerPage]);
-
-  // Get min and max price from products for range slider
-  const priceBounds = useMemo(() => {
-    if (!Array.isArray(products) || products.length === 0) {
-      return { min: 50, max: 5000 };
-    }
-
-    const prices = products
-      .map((p) => parseFloat(p.pro_price || 0))
-      .filter((p) => p > 0);
-    return {
-      min: Math.min(50, ...prices),
-      max: Math.max(5000, ...prices),
-    };
-  }, [products]);
 
   // Get grid column classes based on selected view
   const getGridClasses = () => {
@@ -265,7 +271,7 @@ const Shop = () => {
         const response = await api.get("/getcategory");
         setCategories(response.data);
       } catch (err) {
-        // console.error("Error fetching categories:", err);
+        console.error("Error fetching categories:", err);
       }
     };
 
@@ -296,8 +302,9 @@ const Shop = () => {
           const data = await fetchProducts();
           setProducts(data);
         }
+        setCurrentPage(1); // Reset to first page when products change
       } catch (err) {
-        // console.error("Error fetching products:", err);
+        console.error("Error fetching products:", err);
         setProducts([]);
       } finally {
         setLoading(false);
@@ -340,8 +347,9 @@ const Shop = () => {
   const resetAllFilters = () => {
     setSelectedCategories([]);
     setSelectedRatings([]);
-    setPriceRange([50, 5000]);
-    setDebouncedPriceRange([50, 5000]);
+    const { min, max } = priceBounds;
+    setPriceRange([min, max]);
+    setDebouncedPriceRange([min, max]);
     setSearchQuery("");
     setSortOrder("Ascending Order");
     setCurrentPage(1);
@@ -450,57 +458,15 @@ const Shop = () => {
   return (
     <>
       <Helmet>
-        {/* Basic SEO */}
         <title>Shop | Adroit Alarm Systems</title>
         <meta
           name="description"
-          content="ADROIT is a premier Australian security company specializing in Electronic Security, Home Automation, Audio Visual, Data Cabling, and Ducted Vacuum systems. ASIAL accredited with 20+ years of experience delivering integrated, hassle-free solutions."
+          content="ADROIT is a premier Australian security company specializing in Electronic Security, Home Automation, Audio Visual, Data Cabling, and Ducted Vacuum systems."
         />
-        <meta
-          name="keywords"
-          content="ADROIT, Adroit Alarm System, security companies Australia, electronic security Sydney, home automation Australia, audio visual installation, data cabling contractors, ducted vacuum systems, ASIAL Silver Member, security license holders, integrated security solutions, Dynalite certified, commercial security, residential automation, access control, CCTV installation Australia"
-        />
+        <meta name="keywords" content="ADROIT, Adroit Alarm System, security companies Australia, electronic security Sydney" />
         <meta name="author" content="ADROIT Alarm Systems Australia" />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://shop.adroitalarm.com.au/" />
-
-        {/* Open Graph */}
-        <meta
-          property="og:title"
-          content="ADROIT Alarm Systems | Electronic Security & Automation Experts"
-        />
-        <meta
-          property="og:description"
-          content="Since 2008, ADROIT has delivered premium integrated solutions including security, automation, and AV. Fully licensed (Master License No: 000101930) and ASIAL accredited."
-        />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://shop.adroitalarm.com.au/" />
-        <meta property="og:site_name" content="ADROIT Alarm Systems" />
-
-        {/* Social Links */}
-        <meta
-          property="og:see_also"
-          content="https://www.instagram.com/adroitalarm/"
-        />
-        <meta
-          property="og:see_also"
-          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
-        />
-
-        {/* Facebook  */}
-        <meta property="fb:app_id" content="#" />
-        <meta
-          property="fb:admins"
-          content="https://www.facebook.com/p/Adroit-alarms-100071267801808/"
-        />
-
-        {/* Instagram */}
-        <meta name="instagram:title" content="ADROIT Alarm Systems Australia" />
-        <meta
-          name="instagram:description"
-          content="Integrated solutions in electronic security, automation, audio visual and data cabling. Trusted Australian security specialists since 2008."
-        />
-        <meta name="instagram:site" content="@adroitalarm" />
       </Helmet>
 
       <section>
@@ -611,7 +577,7 @@ const Shop = () => {
                   <input
                     type="text"
                     className="form-control rounded-0"
-                    placeholder="Search..."
+                    placeholder="Search products..."
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
@@ -674,8 +640,7 @@ const Shop = () => {
                 className="bg-light border p-3 position-absolute rounded-0 top-0 start-0 end-0"
                 style={{
                   zIndex: 1050,
-                  boxShadow:
-                    "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
+                  boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
                   maxHeight: "500px",
                   overflowY: "auto",
                 }}
@@ -749,9 +714,9 @@ const Shop = () => {
                         collapsedSections.ratings ? "collapsed" : ""
                       }`}
                     >
-                      {[5, 4, 3, 2, 1].map((star, index) => (
+                      {[5, 4, 3, 2, 1].map((star) => (
                         <div
-                          key={index}
+                          key={star}
                           className="form-check d-flex align-items-center mb-2"
                         >
                           <input
@@ -807,8 +772,8 @@ const Shop = () => {
                       <div className="px-1">
                         <Range
                           step={10}
-                          min={50}
-                          max={5000}
+                          min={priceBounds.min}
+                          max={priceBounds.max}
                           values={priceRange}
                           onChange={handlePriceRangeChange}
                           renderTrack={({ props, children }) => {
@@ -830,8 +795,8 @@ const Shop = () => {
                                     position: "absolute",
                                     height: "2px",
                                     background: "#0d6efd",
-                                    left: `${((priceRange[0] - 50) / (5000 - 50)) * 100}%`,
-                                    right: `${100 - ((priceRange[1] - 50) / (5000 - 50)) * 100}%`,
+                                    left: `${((priceRange[0] - priceBounds.min) / (priceBounds.max - priceBounds.min)) * 100}%`,
+                                    right: `${100 - ((priceRange[1] - priceBounds.min) / (priceBounds.max - priceBounds.min)) * 100}%`,
                                   }}
                                 />
                                 {children}
@@ -859,8 +824,8 @@ const Shop = () => {
                         />
 
                         <div className="d-flex justify-content-between mt-2">
-                          <span className="small">${50}</span>
-                          <span className="small">${5000}</span>
+                          <span className="small">${priceBounds.min}</span>
+                          <span className="small">${priceBounds.max}</span>
                         </div>
                       </div>
                     </div>
@@ -921,8 +886,9 @@ const Shop = () => {
             </div>
           </div>
 
+          {/* Pagination */}
           {totalPages > 1 && (
-            <nav>
+            <nav className="mt-4">
               <ul className="pagination justify-content-center gap-2">
                 <li
                   className={`page-item ${currentPage === 1 ? "disabled" : ""}`}
@@ -979,10 +945,13 @@ const Shop = () => {
             </nav>
           )}
 
-          {!loading && (
+          {/* Showing info */}
+          {!loading && sortedProducts.length > 0 && (
             <div className="text-center small heading mt-3 text-muted">
-              Showing {paginatedProducts.length} of {sortedProducts.length}{" "}
-              products
+              Showing {paginatedProducts.length} of {sortedProducts.length} products
+              {sortedProducts.length < products.length && 
+                ` (${products.length - sortedProducts.length} filtered out)`
+              }
             </div>
           )}
         </div>

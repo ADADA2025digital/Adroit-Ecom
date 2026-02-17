@@ -65,7 +65,7 @@ export const CartProvider = ({ children }) => {
         const guestCart = JSON.parse(
           localStorage.getItem("guest_cart") || "[]"
         );
-        console.log("🛒 Fetched guest cart:", guestCart);
+        // console.log("Fetched guest cart:", guestCart);
         setCart(guestCart);
         dispatchCartUpdate();
         return;
@@ -91,12 +91,12 @@ export const CartProvider = ({ children }) => {
         formattedImage: formatImageUrl(item.images || item.imgurl),
       }));
 
-      console.log("🔐 Fetched user cart:", transformed);
+      // console.log("Fetched user cart:", transformed);
       setCart(transformed);
       dispatchCartUpdate();
       setError(null);
     } catch (err) {
-      console.error("❌ Error fetching cart:", err);
+      // console.error("Error fetching cart:", err);
       setError(err.response?.data?.message || "Failed to load cart");
     } finally {
       setIsLoading(false);
@@ -116,7 +116,7 @@ export const CartProvider = ({ children }) => {
 
   const syncGuestCartAfterLogin = async () => {
     const guestCart = JSON.parse(localStorage.getItem("guest_cart") || "[]");
-    console.log("🔄 Syncing guest cart after login:", guestCart);
+    // console.log("Syncing guest cart after login:", guestCart);
     if (guestCart.length === 0) return;
 
     try {
@@ -147,7 +147,7 @@ export const CartProvider = ({ children }) => {
         const key = `${guestItem.product_id}_${guestItem.size || "M"}`;
 
         if (userCartKeys.has(key)) {
-          console.log(`🟡 Skipping already existing item in user cart: ${key}`);
+          // console.log(`Skipping already existing item in user cart: ${key}`);
           continue;
         }
 
@@ -165,25 +165,25 @@ export const CartProvider = ({ children }) => {
               },
             }
           );
-          console.log(`✅ Added guest item to user cart: ${key}`);
+          // console.log(`Added guest item to user cart: ${key}`);
         } catch (err) {
-          console.error(`❌ Failed to add guest item ${key}:`, err);
+          // console.error(`Failed to add guest item ${key}:`, err);
         }
       }
 
       localStorage.removeItem("guest_cart");
-      console.log("🧹 Guest cart cleared after login sync");
+      // console.log("Guest cart cleared after login sync");
 
       await fetchCart();
     } catch (err) {
-      console.error("❌ Error syncing guest cart:", err);
+      // console.error("Error syncing guest cart:", err);
       setError("Failed to sync guest cart items");
     }
   };
 
   // ENHANCED: Real-time add to cart with optimistic updates
   const addToCart = useCallback(async (product, quantity = 1, size = "M") => {
-    console.log("➕ Adding to cart:", { product, quantity, size });
+    // console.log("Adding to cart:", { product, quantity, size });
     
     const token = localStorage.getItem("auth_token");
 
@@ -221,7 +221,7 @@ export const CartProvider = ({ children }) => {
     }
 
     if (typeof product_id === "string" && product_id.startsWith("PRO")) {
-      console.error("❌ Cannot add to cart. SKU (not numeric ID) used:", product_id);
+      // console.error("Cannot add to cart. SKU (not numeric ID) used:", product_id);
       return;
     }
 
@@ -267,7 +267,7 @@ export const CartProvider = ({ children }) => {
       }
 
       localStorage.setItem("guest_cart", JSON.stringify(guestCart));
-      console.log("➕ Updated guest cart in localStorage:", guestCart);
+      // console.log("Updated guest cart in localStorage:", guestCart);
       return;
     }
 
@@ -298,20 +298,20 @@ export const CartProvider = ({ children }) => {
             }
           );
           
-          console.log(`✅ Synced with server: ${product_id}`);
+          // console.log(`Synced with server: ${product_id}`);
           pendingUpdates.current.delete(updateKey);
           
           // Optionally refresh from server to ensure consistency
           // fetchCart();
         } catch (err) {
-          console.error("❌ Server sync failed:", err);
+          // console.error("Server sync failed:", err);
           // If server sync fails, you might want to revert or show error
           setError("Failed to sync with server. Your items are saved locally.");
           pendingUpdates.current.delete(updateKey);
         }
       });
     } catch (err) {
-      console.error("❌ Error in addToCart:", err);
+      // console.error("Error in addToCart:", err);
       setError(err.response?.data?.message || "Failed to add item to cart");
     }
   }, [cart, debouncedServerSync, dispatchCartUpdate, formatImageUrl]);
@@ -356,9 +356,9 @@ export const CartProvider = ({ children }) => {
         { quantity: newQuantity },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log(`✏️ Updated user cart item ${product_id} to quantity: ${newQuantity}`);
+      // console.log(`Updated user cart item ${product_id} to quantity: ${newQuantity}`);
     } catch (err) {
-      console.error("❌ Error updating quantity:", err);
+      // console.error("Error updating quantity:", err);
       // Revert on error
       fetchCart();
       setError(err.response?.data?.message || "Failed to update quantity");
@@ -386,9 +386,9 @@ export const CartProvider = ({ children }) => {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      console.log(`🗑️ Removed item ${product_id} from user cart`);
+      // console.log(`Removed item ${product_id} from user cart`);
     } catch (err) {
-      console.error("❌ Error removing item:", err);
+      // console.error("Error removing item:", err);
       // Revert on error
       fetchCart();
       setError(err.response?.data?.message || "Failed to remove item");
@@ -404,7 +404,7 @@ export const CartProvider = ({ children }) => {
 
     if (!token) {
       localStorage.removeItem("guest_cart");
-      console.log("🧹 Cleared guest cart");
+      // console.log("Cleared guest cart");
       return;
     }
 
@@ -419,15 +419,13 @@ export const CartProvider = ({ children }) => {
           )
         )
       );
-      console.log("🧹 Cleared user cart");
     } catch (err) {
-      console.error("❌ Error clearing cart:", err);
+      // console.error("Error clearing cart:", err);
       // Even if API call fails, keep local state cleared
     }
   }, [cart, dispatchCartUpdate]);
 
   const forceRefreshCart = useCallback(async () => {
-    console.log("🔄 Force refreshing cart...");
     await fetchCart();
   }, [fetchCart]);
 

@@ -45,27 +45,26 @@ export const fetchProductsByItemTypes = async (selectedItemTypes) => {
   }
 };
 
-export const fetchProducts = async () => {
+export const fetchProducts = async (options = {}) => {
   try {
-    const response = await axios.get(
-      `${import.meta.env.VITE_API_URL}api/products`
-    );
+    const baseURL = import.meta.env.VITE_API_URL;
+    const response = await axios.get(`${baseURL}api/products`);
 
-    // console.log("Full API Response:", response); 
-    // console.log("Response Data:", response.data); 
+    console.log("Raw API Response:", response.data);
+    console.log("Products array length:", response.data.products?.length);
+    console.log("Total count from API:", response.data.count);
 
     if (response.data && Array.isArray(response.data.products)) {
-      // console.log("Products Fetched:", response.data.products); 
-      return response.data.products;
-    } else {
-      // console.error("Invalid API response format:", response.data);
-      return [];
+      // Check for duplicate IDs
+      const products = response.data.products;
+      const uniqueIds = new Set(products.map(p => p.id || p.product_id));
+      console.log("Unique product IDs:", uniqueIds.size);
+      
+      return products;
     }
+    return [];
   } catch (error) {
-    //  console.error(
-    //   "Error fetching products:",
-    //   error.response ? error.response.data : error.message
-    // );
+    console.error("Error fetching products:", error);
     return [];
   }
 };

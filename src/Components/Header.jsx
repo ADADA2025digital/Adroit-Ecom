@@ -37,11 +37,11 @@ const Header = ({ isLoggedIn }) => {
 
   // Debug log to verify cart updates
   useEffect(() => {
-    console.log("🛍️ Header cart updated:", {
-      count: cartCount,
-      items: cart.length,
-      total: cartTotal
-    });
+    // console.log("Header cart updated:", {
+    //   count: cartCount,
+    //   items: cart.length,
+    //   total: cartTotal
+    // });
   }, [cart, cartCount, cartTotal]);
 
   useEffect(() => {
@@ -105,7 +105,7 @@ const Header = ({ isLoggedIn }) => {
   // Custom event listener for cart updates from context
   useEffect(() => {
     const handleCartUpdate = () => {
-      console.log("📢 Cart update event received in Header");
+      // console.log("Cart update event received in Header");
       // Force re-render
       measureHeader();
     };

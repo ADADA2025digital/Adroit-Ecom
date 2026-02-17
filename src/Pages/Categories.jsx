@@ -16,6 +16,7 @@ const Categories = () => {
   const fetchCategories = async () => {
     try {
       const response = await api.get("/getcategory");
+      console.log("Categories response:", response);
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
       // console.error("Failed to fetch categories:", error);
