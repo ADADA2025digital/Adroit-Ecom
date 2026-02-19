@@ -1,202 +1,12 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../Config/api";
-import emailjs from "@emailjs/browser";
 
 function OrderSummary() {
   const [orderSummary, setOrderSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [emailStatus, setEmailStatus] = useState({
-    sent: false,
-    sending: false,
-    error: null,
-  });
   const navigate = useNavigate();
-  const emailTriggeredRef = useRef(false);
-
-  useEffect(() => {
-    emailjs.init("1JhpDFWb4tZlLmkCh"); // Your EmailJS public key
-  }, []);
-
-  const hasEmailBeenSent = (orderId) => {
-    return localStorage.getItem(`email_sent_${orderId}`) === "true";
-  };
-
-  const markEmailAsSent = (orderId) => {
-    localStorage.setItem(`email_sent_${orderId}`, "true");
-  };
-
-  const sendConfirmationEmail = async (orderData) => {
-    const orderId = orderData.order_id;
-
-    if (hasEmailBeenSent(orderId)) {
-      setEmailStatus((prev) => ({ ...prev, sent: true }));
-      return;
-    }
-
-    if (!orderData.user_details?.email) {
-      console.warn("No email address available for order confirmation");
-      return;
-    }
-
-    try {
-      setEmailStatus({ sent: false, sending: true, error: null });
-
-      // Calculate the correct total from items
-      const subtotal = orderData.items.reduce(
-        (acc, item) => acc + parseFloat(item.unit_price) * item.quantity,
-        0,
-      );
-
-      // Helper function to get full image URL
-      const getFullImageUrl = (imagePath) => {
-        if (!imagePath) return "";
-        if (
-          imagePath.startsWith("http://") ||
-          imagePath.startsWith("https://")
-        ) {
-          return imagePath;
-        }
-        const baseUrl =
-          process.env.REACT_APP_API_URL || "http://localhost:5000";
-        const cleanPath = imagePath.startsWith("/")
-          ? imagePath.slice(1)
-          : imagePath;
-        return `${baseUrl}/${cleanPath}`;
-      };
-
-      // Build the products HTML with images
-      const productsHtml = orderData.items
-        .map((item) => {
-          const imageUrl = getFullImageUrl(item.image);
-          const itemTotal = (
-            parseFloat(item.unit_price) * item.quantity
-          ).toFixed(2);
-          const unitPrice = parseFloat(item.unit_price).toFixed(2);
-
-          return `
-        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 16px;">
-          <tr>
-            <td width="70" style="padding: 8px 0; vertical-align: middle;">
-              ${
-                imageUrl
-                  ? `
-                <img src="${imageUrl}" alt="${item.product_name}" 
-                  width="60" height="60" 
-                  style="display: block; width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0;"
-                  onerror="this.onerror=null; this.src='https://via.placeholder.com/60x60?text=No+Image';"
-                />
-              `
-                  : `
-                <table width="60" height="60" cellpadding="0" cellspacing="0" border="0" 
-                  style="width: 60px; height: 60px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e2e8f0;">
-                  <tr>
-                    <td align="center" valign="middle" style="font-family: Arial, sans-serif; font-size: 10px; color: #94a3b8;">
-                      No Image
-                    </td>
-                  </tr>
-                </table>
-              `
-              }
-            </td>
-            <td style="padding: 8px 12px; vertical-align: middle;">
-              <div style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 600; color: #0b1220; margin-bottom: 4px;">
-                ${item.product_name}
-              </div>
-              <div style="font-family: Arial, sans-serif; font-size: 12px; color: #64748b;">
-                Qty: ${item.quantity} | Size: L
-              </div>
-            </td>
-            <td align="right" style="padding: 8px 0; vertical-align: middle;">
-              <div style="font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; color: #0b1220;">
-                $${itemTotal}
-              </div>
-              <div style="font-family: Arial, sans-serif; font-size: 11px; color: #94a3b8;">
-                $${unitPrice} each
-              </div>
-            </td>
-          </tr>
-        </table>
-        ${!item.isLast ? '<div style="height: 1px; background: #e2e8f0; margin: 8px 0;"></div>' : ""}
-      `;
-        })
-        .join("");
-
-      // Format shipping address
-      const shippingAddress = orderData.shipping_address
-        ? {
-            address: orderData.shipping_address.address || "",
-            suburb: orderData.shipping_address.suburb || "",
-            state: orderData.shipping_address.state || "",
-            postcode: orderData.shipping_address.postcode || "",
-          }
-        : null;
-
-      const templateParams = {
-        // Customer info
-        customer_name: orderData.user_details?.name || "Customer",
-        customer_email: orderData.user_details?.email,
-        customer_phone: orderData.user_details?.phone || "",
-
-        // Order info
-        order_id: orderId,
-        order_date: new Date(orderData.order_date).toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        }),
-        order_status: orderData.order_status || "Confirmed",
-
-        // Payment info
-        payment_method: orderData.payment_method || "Credit Card",
-        payment_status: orderData.payment_status || "Completed",
-
-        // Address info
-        shipping_address: shippingAddress?.address || "",
-        shipping_suburb: shippingAddress?.suburb || "",
-        shipping_state: shippingAddress?.state || "",
-        shipping_postcode: shippingAddress?.postcode || "",
-
-        // Products HTML - This will contain all products with images
-        products_html: productsHtml,
-
-        // Financial info
-        subtotal: subtotal.toFixed(2),
-        shipping_cost: "0.00",
-        total: subtotal.toFixed(2),
-
-        // Support info
-        support_email: "support@adroitgroup.biz",
-        support_phone: "043 317 2345",
-        store_address: "15/51 Meacher Street Mt. Druitt 2770, NSW",
-
-        // Current year for copyright
-        current_year: new Date().getFullYear().toString(),
-
-        // Tracking URL
-        tracking_url: `https://yourapp.com/track/${orderId}`,
-
-        // Unsubscribe link
-        unsubscribe_url: "#",
-      };
-
-      // console.log("Sending email with products HTML:", productsHtml);
-
-      // Send to EmailJS
-      await emailjs.send("service_atcmru7", "template_xjwh0fb", templateParams);
-
-      markEmailAsSent(orderId);
-      setEmailStatus({ sent: true, sending: false, error: null });
-    } catch (error) {
-      // console.error("Email sending failed:", error);
-      setEmailStatus({
-        sent: false,
-        sending: false,
-        error: "Failed to send confirmation email",
-      });
-    }
-  };
 
   useEffect(() => {
     const fetchOrderSummary = async () => {
@@ -213,20 +23,10 @@ function OrderSummary() {
         if (response.data.success && response.data.order_summary) {
           const summary = response.data.order_summary;
           setOrderSummary(summary);
-
-          if (
-            summary.user_details?.email &&
-            !hasEmailBeenSent(summary.order_id) &&
-            !emailTriggeredRef.current
-          ) {
-            emailTriggeredRef.current = true;
-            await sendConfirmationEmail(summary);
-          }
         } else {
           setError("Failed to load order summary");
         }
       } catch (err) {
-        // console.error("Error fetching order summary:", err);
         let errorMessage =
           "Failed to load order details. Please try again later.";
         if (err.response?.status === 401) {
@@ -278,23 +78,6 @@ function OrderSummary() {
           <h1 className="fw-bold">THANK YOU</h1>
           <p className="text-center mt-2">
             Payment Is Successfully Processed And Your Order Is On The Way
-            <br />
-            {emailStatus.sent && (
-              <span className="d-block text-success mt-2">
-                A confirmation email has been sent to{" "}
-                {orderSummary.user_details?.email}
-              </span>
-            )}
-            {emailStatus.sending && (
-              <span className="d-block text-muted mt-2">
-                Sending confirmation email...
-              </span>
-            )}
-            {emailStatus.error && (
-              <span className="d-block text-danger mt-2">
-                {emailStatus.error}
-              </span>
-            )}
           </p>
         </div>
       </div>

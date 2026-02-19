@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import api from "../Config/api";
-import emailjs from "@emailjs/browser";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../Components/PageHeader";
 import GlobalButton from "../Components/Button";
@@ -23,13 +22,6 @@ const PasswordReset = () => {
   // State for password visibility
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // EmailJS configuration
-  const EMAILJS_CONFIG = {
-    SERVICE_ID: "service_atcmru7",
-    TEMPLATE_ID: "template_rxvne43",
-    PUBLIC_KEY: "1JhpDFWb4tZlLmkCh",
-  };
 
   // Dynamic email validation regex
   const validateEmail = (email) => {
@@ -91,53 +83,6 @@ const PasswordReset = () => {
     }, 5000);
   };
 
-  // Function to send email using EmailJS
-  const sendEmailWithEmailJS = async (email, otpCode, resetToken) => {
-    try {
-      const templateParams = {
-        to_email: email,
-        to_name: email.split("@")[0],
-        otpCode: otpCode,
-        reset_link: `${window.location.origin}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`,
-        year: new Date().getFullYear(),
-        subject: "Password Reset Verification Code",
-        message: "Your verification code for password reset",
-        current_date: new Date()
-          .toLocaleDateString("en-US", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })
-          .replace(",", ""),
-      };
-
-      const response = await emailjs.send(
-        EMAILJS_CONFIG.SERVICE_ID,
-        EMAILJS_CONFIG.TEMPLATE_ID,
-        templateParams,
-        EMAILJS_CONFIG.PUBLIC_KEY,
-      );
-
-      // console.log("EmailJS success response:", response);
-      return { success: true, message: "Email sent successfully" };
-    } catch (error) {
-      // console.error("Error message:", error.message);
-
-      // Log the actual response if available
-      if (error.response) {
-        // console.error("Error response:", error.response);
-      }
-
-      return {
-        success: false,
-        message:
-          error.text ||
-          error.message ||
-          "Failed to send email. Please try again.",
-      };
-    }
-  };
-
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     setFormSubmitted(true);
@@ -161,33 +106,17 @@ const PasswordReset = () => {
     try {
       const response = await api.post("/forgot-password", { email });
 
-      // console.log("API Response:", response.data);
-
       if (response.data.status === 200) {
         setToken(response.data.token);
         setFormSubmitted(false); // Reset form submitted state on success
-
-        // Send email using EmailJS with the OTP
-        const emailResult = await sendEmailWithEmailJS(
-          email,
-          response.data.otp,
-          response.data.token,
+        setStep(2);
+        showSuccessMessage(
+          "OTP sent to your email address. Check your spam folder if not received.",
         );
-
-        if (emailResult.success) {
-          setStep(2);
-          showSuccessMessage(
-            "OTP sent to your email address. Check your spam folder if not received.",
-          );
-        } else {
-          setError(emailResult.message);
-        }
       } else {
         setError(response.data.message || "Failed to send OTP");
       }
     } catch (error) {
-      // console.error("API Error:", error);
-
       let errorMessage = "Failed to process your request. Please try again.";
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
@@ -243,8 +172,6 @@ const PasswordReset = () => {
         password_confirmation: confirmPassword,
       });
 
-      // console.log("API Response:", response.data);
-
       if (response.data.status === 200) {
         showSuccessMessage(
           "Password reset successfully! Redirecting to login...",
@@ -256,8 +183,6 @@ const PasswordReset = () => {
         setError(response.data.message || "Failed to reset password");
       }
     } catch (error) {
-      // console.error("API Error:", error);
-
       let errorMessage = "Failed to reset password";
 
       if (error.response?.data) {
@@ -293,18 +218,7 @@ const PasswordReset = () => {
 
       if (response.data.status === 200) {
         setToken(response.data.token);
-
-        const emailResult = await sendEmailWithEmailJS(
-          email,
-          response.data.otp,
-          response.data.token,
-        );
-
-        if (emailResult.success) {
-          showSuccessMessage("OTP resent successfully. Check your email.");
-        } else {
-          setError(emailResult.message);
-        }
+        showSuccessMessage("OTP resent successfully. Check your email.");
       }
     } catch (error) {
       setError("Failed to resend OTP. Please try again.");
